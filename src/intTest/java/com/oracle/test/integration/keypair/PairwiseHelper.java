@@ -45,6 +45,11 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.crypto.KEM;
+import javax.crypto.KEM.Decapsulator;
+import javax.crypto.KEM.Encapsulated;
+import javax.crypto.KEM.Encapsulator;
+import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 
@@ -54,13 +59,27 @@ import com.oracle.jiphertest.util.TestUtil;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+
 public class PairwiseHelper {
 
     static void pairwiseConsistency(PublicKey pub, PrivateKey priv) throws Exception {
-        if (pub.getAlgorithm().equals("DH")) {
+        String keyAlgo = pub.getAlgorithm();
+        if ("DH".equals(keyAlgo)) {
             DHPublicKey dhPub = (DHPublicKey) pub;
             DHPrivateKey dhPriv = (DHPrivateKey) priv;
             assertEquals(dhPub.getParams().getG().modPow(dhPriv.getX(), dhPub.getParams().getP()), dhPub.getY());
+        } else if ("ML-KEM".equals(keyAlgo)) {
+            KEM me = ProviderUtil.getKEM(keyAlgo);
+            Encapsulator encapsulator = me.newEncapsulator(pub);
+            Encapsulated encapsulated = encapsulator.encapsulate();
+            SecretKey localShare = encapsulated.key();
+            byte[] forPeer = encapsulated.encapsulation();
+
+            KEM peer = ProviderUtil.getKEM(keyAlgo);
+            Decapsulator decapsulator = peer.newDecapsulator(priv);
+            SecretKey peerShare = decapsulator.decapsulate(forPeer);
+            assertEquals(localShare, peerShare);
+
         } else {
             Signature sig = ProviderUtil.getSignature(sigAlg(pub.getAlgorithm()));
             sig.initSign(priv);
@@ -82,6 +101,7 @@ public class PairwiseHelper {
             case "RSA" -> "SHA256withRSA";
             case "EC" -> "SHA256withECDSA";
             case "DSA" -> "SHA224withDSA";
+            case "ML-DSA" -> "ML-DSA";
             default -> throw new Error("Pairwise test not implemented.");
         };
     }

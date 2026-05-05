@@ -46,6 +46,10 @@ public class DataMatchers {
         return new Simple(alg);
     }
 
+    public static TestDataMatcher secParam(String secParam) {
+        return new Simple().secParam(secParam);
+    }
+
     public static TestDataMatcher keyId(final String id) {
         return new Simple().keyId(id);
     }

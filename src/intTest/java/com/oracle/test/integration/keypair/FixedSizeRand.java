@@ -38,22 +38,29 @@
  * SOFTWARE.
  */
 
-package com.oracle.jipher.internal.openssl;
+package com.oracle.test.integration.keypair;
 
-import org.junit.Test;
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
+import java.util.concurrent.ThreadLocalRandom;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+public class FixedSizeRand extends SecureRandom {
 
-public class OpenSsslValidatorTest {
+    private static final long serialVersionUID = 1L;
+    ByteBuffer buf;
 
-    @Test
-    public void isAvailable() {
-        assertTrue(OpenSslValidator.isAvailable());
+    FixedSizeRand(int size) {
+        byte[] fixedRand = new byte[size];
+        ThreadLocalRandom.current().nextBytes(fixedRand);
+        buf = ByteBuffer.wrap(fixedRand);
     }
 
-    @Test
-    public void loadingException() {
-        assertNull(OpenSslValidator.loadingException());
+    @Override
+    public void nextBytes(byte[] bytes) {
+        // Rewind when fully drained to allow for reuse.
+        if (buf.remaining() == 0) {
+            buf.rewind();
+        }
+        buf.get(bytes);
     }
 }

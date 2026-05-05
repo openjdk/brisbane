@@ -54,9 +54,11 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.ECParameterSpec;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import javax.crypto.Cipher;
+import javax.crypto.KEM;
 import javax.crypto.KeyAgreement;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.spec.DHParameterSpec;
@@ -68,9 +70,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import com.oracle.jiphertest.util.FipsProviderInfoUtil;
 import com.oracle.jiphertest.util.ProviderUtil;
 
 import static org.junit.Assert.assertTrue;
+
 
 @RunWith(Parameterized.class)
 public class KeyPairDestroyTest {
@@ -79,7 +83,17 @@ public class KeyPairDestroyTest {
 
     @Parameterized.Parameters(name="{0}")
     public static Collection<String> params() throws Exception {
-        return Arrays.asList("DH", "EC", "RSA");
+        List<String> params = new ArrayList<>();
+        params.add("DH");
+        params.add("EC");
+        params.add("RSA");
+        if (FipsProviderInfoUtil.isMlKemSupported()) {
+            params.add("ML-KEM");
+        }
+        if (FipsProviderInfoUtil.isMlDsaSupported()) {
+            params.add("ML-DSA");
+        }
+        return params;
     }
 
     public KeyPairDestroyTest(String algorithm) {
@@ -109,6 +123,7 @@ public class KeyPairDestroyTest {
 
     @Test(expected = IllegalStateException.class)
     public void getPrivateComponentOfDestroyedKeyTest() {
+        Assume.assumeTrue(!alg.equals("ML-KEM") && !alg.equals("ML-DSA"));
         if (destroyedPrivateKey instanceof DHPrivateKey) {
             ((DHPrivateKey) destroyedPrivateKey).getX();
         } else if (destroyedPrivateKey instanceof DSAPrivateKey) {
@@ -202,6 +217,15 @@ public class KeyPairDestroyTest {
         } else if (destroyedPrivateKey instanceof RSAPrivateKey) {
             Cipher cipher = ProviderUtil.getCipher(alg + "/ECB/OAEPPadding");
             cipher.init(Cipher.DECRYPT_MODE, destroyedPrivateKey);
+        } else {
+            String algorithm = destroyedPrivateKey.getAlgorithm();
+            if ("ML-KEM".equals(algorithm)) {
+                KEM kem = ProviderUtil.getKEM(algorithm);
+                kem.newDecapsulator(destroyedPrivateKey);
+            } else if ("ML-DSA".equals(algorithm)) {
+                Signature signature = ProviderUtil.getSignature(algorithm);
+                signature.initSign(destroyedPrivateKey);
+            }
         }
     }
 
@@ -217,6 +241,13 @@ public class KeyPairDestroyTest {
             keyFactory.translateKey(new DummyDestroyedECPrivateKey());
         } else if (destroyedPrivateKey instanceof RSAPrivateKey) {
             keyFactory.translateKey(new DummyDestroyedRSAPrivateKey());
+        } else {
+            String algorithm = destroyedPrivateKey.getAlgorithm();
+            if ("ML-KEM".equals(algorithm)) {
+                keyFactory.translateKey(new DummyDestroyedMLKEMPrivateKey());
+            } else if ("ML-DSA".equals(algorithm)) {
+                keyFactory.translateKey(new DummyDestroyedMLDSAPrivateKey());
+            }
         }
     }
 
@@ -304,6 +335,32 @@ public class KeyPairDestroyTest {
         @Override
         public BigInteger getModulus() {
             throw new IllegalStateException("Destroyed Key");
+        }
+    }
+
+    static class DummyDestroyedMLKEMPrivateKey extends DummyDestroyedPrivateKey {
+
+        @Override
+        public String getAlgorithm() {
+            return "ML-KEM";
+        }
+
+        @Override
+        public String getFormat() {
+            return "PKCS#8";
+        }
+    }
+
+    static class DummyDestroyedMLDSAPrivateKey extends DummyDestroyedPrivateKey {
+
+        @Override
+        public String getAlgorithm() {
+            return "ML-DSA";
+        }
+
+        @Override
+        public String getFormat() {
+            return "PKCS#8";
         }
     }
 }

@@ -87,6 +87,7 @@ public class SignatureVectorTest {
 
         Assume.assumeTrue(FipsProviderInfoUtil.isSHA1DigestSignatureSupported() || !(this.alg.toUpperCase().contains("SHA1") || this.alg.toUpperCase().contains("SHA-1")));
         Assume.assumeTrue((FipsProviderInfoUtil.isDSASupported() && EnvUtil.getPolicy() != EnvUtil.FipsPolicy.STRICT) || !this.alg.endsWith("withDSA"));
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlDsaSupported() || !this.alg.contains("ML-DSA"));
 
         if (tv.getKeyId() != null) {
             KeyPairTestData kp = TestData.getFirst(KeyPairTestData.class, keyId(tv.getKeyId()));

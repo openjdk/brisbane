@@ -79,6 +79,7 @@ public class TestData {
         defaultMap.put(SignatureTestVector[].class, "sig.json");
         defaultMap.put(KeyAgreeTestVector[].class, "keyagree.json");
         defaultMap.put(WrapCipherTestVector[].class, "wrapciph.json");
+        defaultMap.put(KemEncapsulatedTestVector[].class, "kem.json");
 
         keyPairs = loadKeyPairs();
         params = loadParamData();

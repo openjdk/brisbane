@@ -46,13 +46,17 @@ import java.security.InvalidParameterException;
 import java.security.KeyPairGenerator;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECGenParameterSpec;
+import java.security.spec.NamedParameterSpec;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.concurrent.ThreadLocalRandom;
 import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.oracle.jiphertest.util.FipsProviderInfoUtil;
 import com.oracle.jiphertest.util.ProviderUtil;
 import com.oracle.jiphertest.util.TestUtil;
 import com.oracle.test.integration.keyfactory.EcParamTestUtil;
@@ -75,12 +79,20 @@ public class KeyPairGenNegativeTest {
     KeyPairGenerator kpRsa;
     KeyPairGenerator kpEc;
     KeyPairGenerator kpDh;
+    KeyPairGenerator kpMlKem;
+    KeyPairGenerator kpMlDsa;
 
     @Before
     public void setUp() throws Exception {
         kpRsa = ProviderUtil.getKeyPairGenerator("RSA");
         kpEc = ProviderUtil.getKeyPairGenerator("EC");
         kpDh = ProviderUtil.getKeyPairGenerator("DH");
+        if (FipsProviderInfoUtil.isMlKemSupported()) {
+            kpMlKem = ProviderUtil.getKeyPairGenerator("ML-KEM");
+        }
+        if (FipsProviderInfoUtil.isMlDsaSupported()) {
+            kpMlDsa = ProviderUtil.getKeyPairGenerator("ML-DSA");
+        }
     }
 
     @Test(expected = InvalidParameterException.class)
@@ -216,6 +228,68 @@ public class KeyPairGenNegativeTest {
 
         doInitInvalid(kpDh, new DHParameterSpec(p, null), "null");
         doInitInvalid(kpDh, new DHParameterSpec(p, BigInteger.ZERO), "zero");
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initInvalidMlKemParams() throws InvalidAlgorithmParameterException {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
+        kpMlKem.initialize(new NamedParameterSpec("ML-DSA-44"));
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initInvalidMlDsaParams() throws InvalidAlgorithmParameterException {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlDsaSupported());
+        kpMlDsa.initialize(new NamedParameterSpec("ML-KEM-1024"));
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initInvalidMlKemSpecificParams() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
+        ProviderUtil.getKeyPairGenerator("ML-KEM-512").initialize(new NamedParameterSpec("ML-KEM-768"));
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initInvalidMlDsaSpecificParams() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlDsaSupported());
+        ProviderUtil.getKeyPairGenerator("ML-DSA-44").initialize(new NamedParameterSpec("ML-DSA-65"));
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initMlKemNonNamedParameterSpec() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
+        kpMlKem.initialize(new IvParameterSpec(new byte[3]));
+    }
+
+    @Test(expected = InvalidAlgorithmParameterException.class)
+    public void initMlDsaNonNamedParameterSpec() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlDsaSupported());
+        kpMlDsa.initialize(new IvParameterSpec(new byte[3]));
+    }
+
+    @Test
+    public void initInvalidMlKemKeySize() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
+        for (String algorithm : new String[] {"ML-KEM", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024"}) {
+            try {
+                ProviderUtil.getKeyPairGenerator(algorithm).initialize(1024);
+                fail("Expected exception");
+            } catch (InvalidParameterException e) {
+                // Expected exception
+            }
+        }
+    }
+
+    @Test
+    public void initInvalidMlDsaKeySize() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMlDsaSupported());
+        for (String algorithm : new String[] {"ML-DSA", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87"}) {
+            try {
+                ProviderUtil.getKeyPairGenerator(algorithm).initialize(87);
+                fail("Expected exception");
+            } catch (InvalidParameterException e) {
+                // Expected exception
+            }
+        }
     }
 
     private void doInitInvalid(KeyPairGenerator kpg, AlgorithmParameterSpec spec, String msgCheck) throws Exception {

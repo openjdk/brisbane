@@ -145,8 +145,16 @@ public class JipherJCETest {
                 "RSA/ECB/OAEPWithSHA-512andMGF1Padding"
         });
         serviceAlgorithms.put("KDF", new String[]{"HKDF-SHA256", "HKDF-SHA384", "HKDF-SHA512"});
+
+        serviceAlgorithms.put("KEM", new String[]{"ML-KEM", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024"});
+
         serviceAlgorithms.put("KeyAgreement", new String[]{"DH", "ECDH"});
-        serviceAlgorithms.put("KeyFactory", new String[]{"DH", "DSA", "EC", "RSA", "RSASSA-PSS"});
+
+        serviceAlgorithms.put("KeyFactory", new String[]{"DH", "DSA", "EC",
+                "ML-DSA", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87",
+                "ML-KEM", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024",
+                "RSA", "RSASSA-PSS"});
+
         serviceAlgorithms.put("KeyGenerator", new String[]{
                 "AES_128/CBC/PKCS5Padding",
                 "AES_128/CFB/NoPadding",
@@ -174,7 +182,12 @@ public class JipherJCETest {
                 "SunTlsExtendedMasterSecret",
                 "SunTlsRsaPremasterSecret"
         });
-        serviceAlgorithms.put("KeyPairGenerator", new String[]{"DH", "EC", "RSA", "RSASSA-PSS"});
+
+        serviceAlgorithms.put("KeyPairGenerator", new String[]{"DH", "EC",
+                "ML-DSA", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87",
+                "ML-KEM", "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024",
+                "RSA", "RSASSA-PSS"});
+
         serviceAlgorithms.put("Mac", new String[]{
                 "HmacSHA1",
                 "HmacSHA224",
@@ -182,6 +195,7 @@ public class JipherJCETest {
                 "HmacSHA384",
                 "HmacSHA512"
         });
+
         serviceAlgorithms.put("MessageDigest", new String[]{"SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512",
                 "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"});
         serviceAlgorithms.put("SecretKeyFactory", new String[]{
@@ -211,7 +225,12 @@ public class JipherJCETest {
                 "PBKDF2WithHmacSHA512and8BIT"
         });
         serviceAlgorithms.put("SecureRandom", new String[]{"DRBG"});
+
         serviceAlgorithms.put("Signature", new String[]{
+                "ML-DSA",
+                "ML-DSA-44",
+                "ML-DSA-65",
+                "ML-DSA-87",
                 "NONEwithDSA",
                 "NONEwithECDSA",
                 "NONEwithRSA",
@@ -238,6 +257,7 @@ public class JipherJCETest {
                 "SHA512withRSA",
                 "SHA512withRSAandMGF1"
         });
+
         SERVICE_ALGORITHMS = serviceAlgorithms;
     }
 
@@ -336,7 +356,7 @@ public class JipherJCETest {
     @Test
     public void serviceAlgorithmRegistrationWithFipsProviderCapabilities()
     {
-        for (int index = 0; index < (1 << 3); index++) {
+        for (int index = 0; index < (1 << 5); index++) {
             testServiceAlgorithmRegistrationWithFipsProviderCapabilities(index);
         }
     }
@@ -345,13 +365,18 @@ public class JipherJCETest {
         boolean isDESEDESupported                  = (index & (1 << 0)) != 0;
         boolean isDSASupported                     = (index & (1 << 1)) != 0;
         boolean isSHA1DigestSignatureSupported     = (index & (1 << 2)) != 0;
+        boolean isMLDSASupported                   = (index & (1 << 3)) != 0;
+        boolean isMLKEMSupported                   = (index & (1 << 4)) != 0;
 
         try (MockedStatic<Capabilities> MockCapabilities = Mockito.mockStatic(Capabilities.class)) {
             MockCapabilities.when(Capabilities::isDESEDESupported).thenReturn(isDESEDESupported);
             MockCapabilities.when(Capabilities::isDSASupported).thenReturn(isDSASupported);
             MockCapabilities.when(Capabilities::isSHA1DigestSignatureSupported).thenReturn(isSHA1DigestSignatureSupported);
+            MockCapabilities.when(Capabilities::isMlDsaSupported).thenReturn(isMLDSASupported);
+            MockCapabilities.when(Capabilities::isMlKemSupported).thenReturn(isMLKEMSupported);
 
-            testServiceAlgorithmRegistration(isDESEDESupported, isDSASupported, isSHA1DigestSignatureSupported);
+            testServiceAlgorithmRegistration(isDESEDESupported, isDSASupported, isSHA1DigestSignatureSupported,
+                    isMLDSASupported, isMLKEMSupported);
         }
     }
 
@@ -361,30 +386,36 @@ public class JipherJCETest {
             MockCapabilities.when(Capabilities::isDESEDESupported).thenReturn(true);
             MockCapabilities.when(Capabilities::isDSASupported).thenReturn(true);
             MockCapabilities.when(Capabilities::isSHA1DigestSignatureSupported).thenReturn(true);
+            MockCapabilities.when(Capabilities::isMlDsaSupported).thenReturn(true);
+            MockCapabilities.when(Capabilities::isMlKemSupported).thenReturn(true);
 
             try (MockedStatic<ToolkitProperties> MockToolkitProperties = Mockito.mockStatic(ToolkitProperties.class)) {
                 MockToolkitProperties.when(ToolkitProperties::getFipsEnforcementValue).thenReturn(Fips.EnforcementPolicy.FIPS_STRICT);
 
-                testServiceAlgorithmRegistration(false, false, false);
+                testServiceAlgorithmRegistration(false, false, false, true, true);
             }
         }
     }
 
     private static void testServiceAlgorithmRegistration(
-                        boolean isDESEDESupported, boolean isDSASupported, boolean isSHA1DigestSignatureSupported) {
+                        boolean isDESEDESupported, boolean isDSASupported, boolean isSHA1DigestSignatureSupported,
+                        boolean isMLDSSASupported, boolean isMLKEMSupported) {
 
         Provider provider = new JipherJCE();
 
         for (String service : SERVICE_ALGORITHMS.keySet()) {
             for (String algorithm : SERVICE_ALGORITHMS.get(service)) {
                 boolean registrationExpected = isRegistrationExpected(service, algorithm,
-                        isDESEDESupported, isDSASupported, isSHA1DigestSignatureSupported);
+                        isDESEDESupported, isDSASupported, isSHA1DigestSignatureSupported,
+                        isMLDSSASupported, isMLKEMSupported);
 
                 String message = service + "." + algorithm + " should " +
                         (registrationExpected ? "" : "not ") + "be registered when " +
                         "DESEDE is " + (isDESEDESupported ? "" : "not ") + "supported, " +
                         "DSA is " + (isDSASupported ? "" : "not ") + "supported, " +
-                        "SHA1 Digest Signatures are " + (isSHA1DigestSignatureSupported ? "" : "not ") + "supported";
+                        "SHA1 Digest Signatures are " + (isSHA1DigestSignatureSupported ? "" : "not ") + "supported, " +
+                        "ML-DSA is " + (isMLDSSASupported ? "" : "not ") + "supported, " +
+                        "ML-KEM is " + (isMLKEMSupported ? "" : "not ") + "supported";
 
                 Provider.Service s = provider.getService(service, algorithm);
                 if (registrationExpected) {
@@ -397,7 +428,8 @@ public class JipherJCETest {
     }
 
     private static boolean isRegistrationExpected(String service, String algorithm,
-                        boolean isDESEDESupported, boolean isDSASupported, boolean isSHA1DigestSignatureSupported) {
+                        boolean isDESEDESupported, boolean isDSASupported, boolean isSHA1DigestSignatureSupported,
+                        boolean isMLDSASupported, boolean isMLKEMSupported) {
 
         boolean registrationExpected = true;
 
@@ -426,7 +458,19 @@ public class JipherJCETest {
 
         if (!isDSASupported) {
             if (algorithm.toLowerCase().contains("DSA".toLowerCase()) &&
-                    !algorithm.toLowerCase().contains("ECDSA".toLowerCase())) {
+                    !(algorithm.toLowerCase().contains("ECDSA".toLowerCase()) || algorithm.toLowerCase().contains("ML-DSA".toLowerCase()))) {
+                registrationExpected = false;
+            }
+        }
+
+        if (!isMLDSASupported) {
+            if (algorithm.toLowerCase().contains("ML-DSA".toLowerCase())) {
+                registrationExpected = false;
+            }
+        }
+
+        if (!isMLKEMSupported) {
+            if (algorithm.toLowerCase().contains("ML-KEM".toLowerCase())) {
                 registrationExpected = false;
             }
         }

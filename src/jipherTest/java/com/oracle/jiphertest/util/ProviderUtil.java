@@ -54,6 +54,7 @@ import java.security.Signature;
 import java.util.Arrays;
 import java.util.ServiceLoader;
 import javax.crypto.Cipher;
+import javax.crypto.KEM;
 import javax.crypto.KeyAgreement;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
@@ -210,6 +211,14 @@ public class ProviderUtil {
             case FIRST, DYNAMIC_FIRST -> Cipher.getInstance(alg);
             case STRING, DYNAMIC_STRING -> Cipher.getInstance(alg, PROV_STRING);
             default -> Cipher.getInstance(alg, instance);
+        };
+    }
+
+    public static KEM getKEM(String alg) throws Exception {
+        return switch (PROV_USAGE) {
+            case FIRST, DYNAMIC_FIRST -> KEM.getInstance(alg);
+            case STRING, DYNAMIC_STRING -> KEM.getInstance(alg, PROV_STRING);
+            default -> KEM.getInstance(alg, instance);
         };
     }
 

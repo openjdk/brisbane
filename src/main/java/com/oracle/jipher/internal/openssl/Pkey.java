@@ -47,7 +47,9 @@ import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import javax.crypto.spec.DHParameterSpec;
@@ -59,6 +61,7 @@ import com.oracle.jipher.internal.spi.DHFIPSParameterValidationSpec;
 import static com.oracle.jipher.internal.common.EcUtil.InvalidUncompressedECPoint;
 import static com.oracle.jipher.internal.common.EcUtil.decodePointUncompressed;
 import static com.oracle.jipher.internal.common.EcUtil.encodePointUncompressed;
+
 
 /**
  * Pkey object.
@@ -75,11 +78,8 @@ import static com.oracle.jipher.internal.common.EcUtil.encodePointUncompressed;
  */
 public class Pkey implements AutoCloseable {
 
-    public enum KeyType {
-        RSA,
-        DH,
-        DSA,
-        EC
+    enum KeyType {
+        RSA, DH, DSA, EC, ML
     }
 
     enum ContentType {
@@ -103,6 +103,7 @@ public class Pkey implements AutoCloseable {
             OSSL_PARAM.of(EVP_PKEY.PKEY_PARAM_GROUP_NAME, OSSL_PARAM.Type.UTF8_STRING, MAX_GROUP_NAME_BYTES);
 
     private final KeyType keyType;
+    private final String keyAlgoName;
     private final ContentType contentType;
     private final EVP_PKEY evpPkey;
 
@@ -157,12 +158,26 @@ public class Pkey implements AutoCloseable {
      * Creates a PKey of the specified type to encapsulate an EVP_PKEY
      *
      * @param keyType the type of the EVP_PKEY
+     * @param keyAlgoName algorithm associated with the key
+     * @param contentType the selection of components backing the EVP_PKEY
+     * @param createEvpPkey a function that creates a (to be encapsulated) EVP_PKEY in a specified arena
+     */
+    Pkey(KeyType keyType, String keyAlgoName, ContentType contentType, Function<OsslArena, EVP_PKEY> createEvpPkey) {
+        this.keyType = keyType;
+        this.keyAlgoName = keyAlgoName;
+        this.contentType = contentType;
+        this.evpPkey = createEvpPkey.apply(OsslArena.ofAuto());
+    }
+
+    /**
+     * Creates a PKey of the specified type to encapsulate an EVP_PKEY
+     *
+     * @param keyType the type of the EVP_PKEY
+     * @param contentType the selection of components backing the EVP_PKEY
      * @param createEvpPkey a function that creates a (to be encapsulated) EVP_PKEY in a specified arena
      */
     Pkey(KeyType keyType, ContentType contentType, Function<OsslArena, EVP_PKEY> createEvpPkey) {
-        this.keyType = keyType;
-        this.contentType = contentType;
-        this.evpPkey = createEvpPkey.apply(OsslArena.ofAuto());
+        this(keyType, typeToName(keyType), contentType, createEvpPkey);
     }
 
     public void free() {
@@ -182,7 +197,7 @@ public class Pkey implements AutoCloseable {
         // There is no need to call this.evpPkey.isA(<type>) because the encompassing object knows the type
         try (OsslArena confinedArena = OsslArena.ofConfined()) {
             OsslParamBuffer paramBuffer = this.evpPkey.todata(EVP_PKEY.Selection.PUBLIC_KEY, confinedArena);
-            return newPub(this.keyType, paramBuffer);
+            return newPub(this.keyType, this.keyAlgoName, paramBuffer);
         } catch (OpenSslException e) {
             throw new InvalidKeyException("Failed to create " + this.keyType + " public key from key pair", e);
         }
@@ -197,6 +212,13 @@ public class Pkey implements AutoCloseable {
         return this.keyType;
     }
 
+    /**
+     * Get the Algorithm name associated with this pkey.
+     * @return key algorithm name
+     */
+    String getKeyAlgoName() {
+        return this.keyAlgoName;
+    }
     /**
      * Get the Pkey content type.
      * @return the content type
@@ -219,7 +241,7 @@ public class Pkey implements AutoCloseable {
      * @return a new Pkey object that encapsulates a reference to the EVP_PKEY encapsulated by the specified Pkey
      */
     public static Pkey createReference(Pkey pkey) {
-        return new Pkey(pkey.getKeyType(), pkey.getContentType(), arena -> pkey.getEvpPkey().upRef(arena));
+        return new Pkey(pkey.getKeyType(), pkey.getKeyAlgoName(), pkey.getContentType(), arena -> pkey.getEvpPkey().upRef(arena));
     }
 
     /**
@@ -452,6 +474,53 @@ public class Pkey implements AutoCloseable {
         }
     }
 
+    /**
+     * Create a new Pkey ML-KEM or ML-DSA private key of variant keyTypeAlg using raw
+     * private key data.
+     *
+     * @param keyTypeAlg ML-KEM or ML-DSA variant.
+     * @param seed ML private key seed bytes, or null if unavailable.
+     * @param expandedKey ML private key expanded-key bytes, or null if unavailable.
+     * @return The created Pkey.
+     * @throws InvalidKeyException if an error occurs creating the key using the given data.
+     */
+    public static Pkey newMLPriv(String keyTypeAlg, byte[] seed, byte[] expandedKey) throws InvalidKeyException {
+        try {
+            if (seed == null && expandedKey == null) {
+                throw new InvalidKeyException("Both seed and expanded key cannot be null");
+            }
+            List<OSSL_PARAM> params = new ArrayList<>();
+            if (expandedKey != null) {
+                params.add(OSSL_PARAM.of(EVP_PKEY.PKEY_PARAM_PRIV_KEY, expandedKey).sensitive());
+            }
+            if (seed != null) {
+                params.add(OSSL_PARAM.of(EVP_PKEY.PKEY_PARAM_ML_SEED, seed).sensitive());
+            }
+            return newPriv(KeyType.ML, keyTypeAlg, params.toArray(OSSL_PARAM.EMPTY_ARRAY));
+        } catch (OpenSslException e) {
+            throw new InvalidKeyException(e);
+        }
+    }
+
+    /**
+     * Create a new Pkey ML-KEM or ML-DSA public key of variant keyTypeAlg using raw
+     * public key bytes.
+     *
+     * @param keyTypeAlg ML-KEM or ML-DSA variant.
+     * @param pub Raw public key bytes.
+     * @return The created Pkey.
+     * @throws InvalidKeyException if an error occurs creating the key using the given data.
+     */
+    public static Pkey newMLPub(String keyTypeAlg, byte[] pub) throws InvalidKeyException {
+        try {
+            List<OSSL_PARAM> params = new ArrayList<>();
+            params.add(OSSL_PARAM.of(EVP_PKEY.PKEY_PARAM_PUB_KEY, pub));
+            return newPub(KeyType.ML, keyTypeAlg, params.toArray(OSSL_PARAM.EMPTY_ARRAY));
+        } catch (Exception e) {
+            throw new InvalidKeyException(e);
+        }
+    }
+
 
     public static Pkey newEcParams(EcCurve curve) {
         return newParams(KeyType.EC, OSSL_PARAM.of(EVP_PKEY.PKEY_PARAM_GROUP_NAME, curve.sn()));
@@ -473,14 +542,14 @@ public class Pkey implements AutoCloseable {
             case DH -> "DH";
             case DSA -> "DSA";
             case EC -> "EC";
+            case ML -> "ML";
         };
     }
 
-
-    private static Pkey newPub(KeyType type, OsslParamBuffer paramBuffer) {
-        return new Pkey(type, ContentType.PUBLIC_KEY, arena -> {
+    private static Pkey newPub(KeyType type, String keyAlgo, OsslParamBuffer paramBuffer) {
+        return new Pkey(type, keyAlgo, ContentType.PUBLIC_KEY, arena -> {
             try (OsslArena confinedArena = OsslArena.ofConfined()) {
-                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(typeToName(type), confinedArena);
+                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(keyAlgo, confinedArena);
                 evpPkeyCtx.fromdataInit();
                 return evpPkeyCtx.fromdata(EVP_PKEY.Selection.PUBLIC_KEY, arena, paramBuffer);
             }
@@ -488,37 +557,45 @@ public class Pkey implements AutoCloseable {
     }
 
     private static Pkey newPub(KeyType type, OSSL_PARAM... params) {
-        return new Pkey(type, ContentType.PUBLIC_KEY, arena -> {
+        assert type != KeyType.ML;
+        return newPub(type, typeToName(type), params);
+    }
+
+    private static Pkey newPub(KeyType type, String keyAlgo, OSSL_PARAM... params) {
+        return new Pkey(type, keyAlgo, ContentType.PUBLIC_KEY, arena -> {
             try (OsslArena confinedArena = OsslArena.ofConfined()) {
-                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(typeToName(type), confinedArena);
+                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(keyAlgo, confinedArena);
                 evpPkeyCtx.fromdataInit();
                 return evpPkeyCtx.fromdata(EVP_PKEY.Selection.PUBLIC_KEY, arena, params);
             }
         });
     }
 
-
-
-    private static Pkey newPriv(KeyType type, OSSL_PARAM... params) {
-        return new Pkey(type, ContentType.KEY_PAIR, arena -> {
+    private static Pkey newPriv(KeyType type, String keyAlgo, OSSL_PARAM... params) {
+        return new Pkey(type, keyAlgo, ContentType.KEY_PAIR, arena -> {
             try (OsslArena confinedArena = OsslArena.ofConfined()) {
-                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(typeToName(type), confinedArena);
+                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(keyAlgo, confinedArena);
                 evpPkeyCtx.fromdataInit();
                 return evpPkeyCtx.fromdata(EVP_PKEY.Selection.PKEY_KEYPAIR, arena, params);
             }
         });
     }
 
+    private static Pkey newPriv(KeyType type, OSSL_PARAM... params) {
+        assert type != KeyType.ML;
+        return newPriv(type, typeToName(type), params);
+    }
+
     private static Pkey newParams(KeyType type, OSSL_PARAM... params) {
-        return new Pkey(type, ContentType.KEY_PARAMETERS, arena -> {
+        String keyAlgo = typeToName(type);
+        return new Pkey(type, keyAlgo, ContentType.KEY_PARAMETERS, arena -> {
             try (OsslArena confinedArena = OsslArena.ofConfined()) {
-                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(typeToName(type), confinedArena);
+                EVP_PKEY_CTX evpPkeyCtx = LibCtx.newPkeyCtx(keyAlgo, confinedArena);
                 evpPkeyCtx.fromdataInit();
                 return evpPkeyCtx.fromdata(EVP_PKEY.Selection.KEY_PARAMETERS, arena, params);
             }
         });
     }
-
 
     /**
      * Returns the modulus from this (RSA) Pkey.
@@ -657,6 +734,75 @@ public class Pkey implements AutoCloseable {
         } catch (OpenSslException e) {
             Util.clearArrays(params);
             throw new InvalidKeyException("Failed to retrieve RSA private key data", e);
+        }
+    }
+    /**
+     * Returns the ML Private key parameter data for this Pkey.
+     * If all is true then seed, expandedKey and public key data are returned.
+     * If all is false, then only non-sensitive data (public key data) is returned.
+     * @throws InvalidKeyException if an error occurs retrieving the key data
+     */
+    public Map<String, byte[]> getMLPrivKeyData(boolean all) throws InvalidKeyException {
+        if (this.keyType != KeyType.ML || this.contentType != ContentType.KEY_PAIR) {
+            throw new IllegalStateException(
+                    "Cannot retrieve ML private key data from " + this.keyType + " " + this.contentType);
+        }
+
+        OSSL_PARAM osslParamExpanded = null;
+        OSSL_PARAM osslParamSeed = null;
+        OSSL_PARAM osslParamPub;
+        Map<String, byte[]> paramMap = new HashMap<>();
+        try (OsslArena osslArena = OsslArena.ofConfined()) {
+            OsslParamBuffer osslParamBuffer = this.evpPkey.todata(EVP_PKEY.Selection.PKEY_KEYPAIR, osslArena);
+            Optional<OSSL_PARAM> osslParam;
+            if (all) {
+                osslParam = osslParamBuffer.locate(EVP_PKEY.PKEY_PARAM_PRIV_KEY);
+                if (osslParam.isPresent()) {
+                    osslParamExpanded = osslParam.get();
+                    paramMap.put(EVP_PKEY.PKEY_PARAM_PRIV_KEY, osslParamExpanded.byteArrayValue());
+                }
+                osslParam = osslParamBuffer.locate(EVP_PKEY.PKEY_PARAM_ML_SEED);
+                if (osslParam.isPresent()) {
+                    osslParamSeed = osslParam.get();
+                    paramMap.put(EVP_PKEY.PKEY_PARAM_ML_SEED, osslParamSeed.byteArrayValue());
+                }
+            }
+            osslParam = osslParamBuffer.locate(EVP_PKEY.PKEY_PARAM_PUB_KEY);
+            if (osslParam.isPresent()) {
+                osslParamPub = osslParam.get();
+                paramMap.put(EVP_PKEY.PKEY_PARAM_PUB_KEY, osslParamPub.byteArrayValue());
+            }
+            return paramMap;
+        } catch (Exception e) {
+            throw new InvalidKeyException(e);
+        } finally {
+            if (osslParamExpanded != null) {
+                osslParamExpanded.destroy();
+            }
+            if (osslParamSeed != null) {
+                osslParamSeed.destroy();
+            }
+        }
+    }
+
+    /**
+     * Returns the ML Public key data for this Pkey.
+     *
+     * @throws InvalidKeyException if an error occurs retrieving the key data
+     */
+    public byte[] getMLPubKeyData() throws InvalidKeyException {
+        if (this.keyType != KeyType.ML || this.contentType == ContentType.KEY_PARAMETERS) {
+            throw new IllegalStateException(
+                    "Cannot retrieve ML public key data from " + this.keyType + " " + this.contentType);
+        }
+
+        OSSL_PARAM osslParam = null;
+        try (OsslArena osslArena = OsslArena.ofConfined()) {
+            OsslParamBuffer osslParamBuffer = this.evpPkey.todata(EVP_PKEY.Selection.PUBLIC_KEY, osslArena);
+            osslParam = osslParamBuffer.locate(EVP_PKEY.PKEY_PARAM_PUB_KEY).orElseThrow();
+            return osslParam.byteArrayValue();
+        } catch (Exception e) {
+            throw new InvalidKeyException(e);
         }
     }
 

@@ -45,7 +45,10 @@ import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.ECPublicKeySpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Map;
 import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.DHPrivateKeySpec;
 import javax.crypto.spec.DHPublicKeySpec;
@@ -55,6 +58,9 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.oracle.jipher.internal.common.MlUtil;
+import com.oracle.jipher.internal.common.MlUtil.PrivateKeyData;
+import com.oracle.jipher.internal.common.MlUtil.PublicKeyData;
 import com.oracle.jipher.internal.common.NamedCurves;
 import com.oracle.jiphertest.testdata.DataMatchers;
 import com.oracle.jiphertest.testdata.KeyPairTestData;
@@ -71,6 +77,10 @@ public class PkeyTest {
     private ECPrivateKeySpec ecPrivateKeySpec;
     private ECPublicKeySpec ecPublicKeySpec;
     private RSAPrivateCrtKeySpec rsaPrivateCrtKeySpec;
+    private PKCS8EncodedKeySpec mlKEMPrivateKeySpec;
+    private X509EncodedKeySpec mlKEMPublicKeySpec;
+    private PKCS8EncodedKeySpec mlDSAPrivateKeySpec;
+    private X509EncodedKeySpec mlDSAPublicKeySpec;
 
     @Before
     public void setUp() throws Exception {
@@ -90,6 +100,69 @@ public class PkeyTest {
 
         keyPairTestData = TestData.getFirst(KeyPairTestData.class, DataMatchers.alg("RSA").secParam(Integer.toString(2048)));
         this.rsaPrivateCrtKeySpec = (RSAPrivateCrtKeySpec) KeyUtil.getPrivateKeySpec(keyPairTestData.getAlg(), keyPairTestData.getSecParam(), keyPairTestData.getKeyParts());
+
+        keyPairTestData = TestData.getFirst(KeyPairTestData.class, DataMatchers.alg("ML-KEM").secParam("ML-KEM-768"));
+        // Cannot use KeyUtil.getPrivateKeySpec or KeyUtil.getPublicKeySpec here because:
+        // 1. There is no breakdown of the key components.
+        // 2. JDK 25 KeyFactory does not support all encoding formats.
+        this.mlKEMPrivateKeySpec = new PKCS8EncodedKeySpec(keyPairTestData.getPriv());
+        this.mlKEMPublicKeySpec = new X509EncodedKeySpec(keyPairTestData.getPub());
+
+        keyPairTestData = TestData.getFirst(KeyPairTestData.class, DataMatchers.alg("ML-DSA").secParam("ML-DSA-65"));
+        this.mlDSAPrivateKeySpec = new PKCS8EncodedKeySpec(keyPairTestData.getPriv());
+        this.mlDSAPublicKeySpec = new X509EncodedKeySpec(keyPairTestData.getPub());
+    }
+
+    @Test
+    public void newMLKEMPriv() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMLKEMSupported());
+        PrivateKeyData prvData = MlUtil.decodePrivateKey(mlKEMPrivateKeySpec.getEncoded());
+        Assert.assertEquals("Unexpected Alg OID", prvData.algOid(), "2.16.840.1.101.3.4.4.2");
+        try (Pkey pkey = Pkey.newMLPriv("ML-KEM-768", prvData.seed(), prvData.expandedKey())) {
+            Map<String, byte[]> pkeyparams = pkey.getMLPrivKeyData(true);
+            if (prvData.seed() != null) {
+                Assert.assertArrayEquals(prvData.seed(), pkeyparams.get(EVP_PKEY.PKEY_PARAM_ML_SEED));
+            }
+            if (prvData.expandedKey() != null) {
+                Assert.assertArrayEquals(prvData.expandedKey(), pkeyparams.get(EVP_PKEY.PKEY_PARAM_PRIV_KEY));
+            }
+        }
+    }
+
+    @Test
+    public void newMLKEMPub() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMLKEMSupported());
+        PublicKeyData pubData = MlUtil.decodePublicKey(mlKEMPublicKeySpec.getEncoded());
+        Assert.assertEquals("Unexpected Alg OID", pubData.algOid(), "2.16.840.1.101.3.4.4.2");
+        try (Pkey pkey = Pkey.newMLPub("ML-KEM-768", pubData.pubKeyPayload())) {
+            Assert.assertArrayEquals(pkey.getMLPubKeyData(), pubData.pubKeyPayload());
+        }
+    }
+
+    @Test
+    public void newMLDSAPriv() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMLDSASupported());
+        PrivateKeyData prvData = MlUtil.decodePrivateKey(mlDSAPrivateKeySpec.getEncoded());
+        Assert.assertEquals("Unexpected Alg OID", prvData.algOid(), "2.16.840.1.101.3.4.3.18");
+        try (Pkey pkey = Pkey.newMLPriv("ML-DSA-65", prvData.seed(), prvData.expandedKey())) {
+            Map<String, byte[]> pkeyparams = pkey.getMLPrivKeyData(true);
+            if (prvData.seed() != null) {
+                Assert.assertArrayEquals(prvData.seed(), pkeyparams.get(EVP_PKEY.PKEY_PARAM_ML_SEED));
+            }
+            if (prvData.expandedKey() != null) {
+                Assert.assertArrayEquals(prvData.expandedKey(), pkeyparams.get(EVP_PKEY.PKEY_PARAM_PRIV_KEY));
+            }
+        }
+    }
+
+    @Test
+    public void newMLDSAPub() throws Exception {
+        Assume.assumeTrue(FipsProviderInfoUtil.isMLDSASupported());
+        PublicKeyData pubData = MlUtil.decodePublicKey(mlDSAPublicKeySpec.getEncoded());
+        Assert.assertEquals("Unexpected Alg OID", pubData.algOid(), "2.16.840.1.101.3.4.3.18");
+        try (Pkey pkey = Pkey.newMLPub("ML-DSA-65", pubData.pubKeyPayload())) {
+            Assert.assertArrayEquals(pkey.getMLPubKeyData(), pubData.pubKeyPayload());
+        }
     }
 
     @Test

@@ -38,22 +38,40 @@
  * SOFTWARE.
  */
 
-package com.oracle.jipher.internal.openssl;
+package com.oracle.jipher.internal.spi;
 
-import org.junit.Test;
+import java.security.spec.NamedParameterSpec;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+public class PQCParameterSpecs {
 
-public class OpenSsslValidatorTest {
+    public static final String STR_ML_KEM_512 = "ML-KEM-512";
+    public static final String STR_ML_KEM_768 = "ML-KEM-768";
+    public static final String STR_ML_KEM_1024 = "ML-KEM-1024";
+    public static final NamedParameterSpec ML_KEM_512 = new NamedParameterSpec(STR_ML_KEM_512);
+    public static final NamedParameterSpec ML_KEM_768 = new NamedParameterSpec(STR_ML_KEM_768);
+    public static final NamedParameterSpec ML_KEM_1024 = new NamedParameterSpec(STR_ML_KEM_1024);
 
-    @Test
-    public void isAvailable() {
-        assertTrue(OpenSslValidator.isAvailable());
+    public static final String STR_ML_DSA_44 = "ML-DSA-44";
+    public static final String STR_ML_DSA_65 = "ML-DSA-65";
+    public static final String STR_ML_DSA_87 = "ML-DSA-87";
+    public static final NamedParameterSpec ML_DSA_44 = new NamedParameterSpec(STR_ML_DSA_44);
+    public static final NamedParameterSpec ML_DSA_65 = new NamedParameterSpec(STR_ML_DSA_65);
+    public static final NamedParameterSpec ML_DSA_87 = new NamedParameterSpec(STR_ML_DSA_87);
+
+    static boolean isMLKEMSpec(NamedParameterSpec spec) {
+        assert spec != null;
+        String specName = spec.getName();
+        return switch (specName) {
+            case STR_ML_KEM_512, STR_ML_KEM_768, STR_ML_KEM_1024 -> true;
+            default -> false;
+        };
     }
-
-    @Test
-    public void loadingException() {
-        assertNull(OpenSslValidator.loadingException());
+    static boolean isMLDSASpec(NamedParameterSpec spec) {
+        assert spec != null;
+        String specName = spec.getName();
+        return switch (specName) {
+            case STR_ML_DSA_44, STR_ML_DSA_65, STR_ML_DSA_87 -> true;
+            default -> false;
+        };
     }
 }

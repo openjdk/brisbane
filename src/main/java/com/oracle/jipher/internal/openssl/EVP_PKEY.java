@@ -239,12 +239,15 @@ public interface EVP_PKEY extends OsslSetParams {
     /* The following parameter is an octet_string on set and an octet_ptr on get */
     String EXCHANGE_PARAM_KDF_UKM               = "kdf-ukm";
 
+    /* ML-* seed parameter for ML-KEM and ML-DSA */
+    String PKEY_PARAM_ML_SEED           = "seed";                   /* octet_string */
+
     /* ML-DSA parameters */
     String PKEY_PARAM_ML_DSA_INPUT_FORMATS  = "ml-dsa.input_formats";   /* utf8_string */
     String PKEY_PARAM_ML_DSA_OUTPUT_FORMATS = "ml-dsa.output_formats";  /* utf8_string */
     String PKEY_PARAM_ML_DSA_PREFER_SEED    = "ml-dsa.prefer_seed";     /* utf8_string */
     String PKEY_PARAM_ML_DSA_RETAIN_SEED    = "ml-dsa.retain_seed";     /* utf8_string */
-    String PKEY_PARAM_ML_DSA_SEED           = "seed";                   /* octet_string */
+    String PKEY_PARAM_ML_DSA_SEED           = PKEY_PARAM_ML_SEED;       /* octet_string */
 
     /* ML-KEM parameters */
     String PKEY_PARAM_ML_KEM_IMPORT_PCT_TYPE = "ml-kem.import_pct_type"; /* utf8_string */
@@ -252,7 +255,7 @@ public interface EVP_PKEY extends OsslSetParams {
     String PKEY_PARAM_ML_KEM_OUTPUT_FORMATS  = "ml-kem.output_formats"; /* utf8_string */
     String PKEY_PARAM_ML_KEM_PREFER_SEED     = "ml-kem.prefer_seed";    /* utf8_string */
     String PKEY_PARAM_ML_KEM_RETAIN_SEED     = "ml-kem.retain_seed";    /* utf8_string */
-    String PKEY_PARAM_ML_KEM_SEED            = "seed";                  /* octet_string */
+    String PKEY_PARAM_ML_KEM_SEED            = PKEY_PARAM_ML_SEED;      /* octet_string */
 
     /* SLH-DSA parameters */
     String PKEY_PARAM_SLH_DSA_SEED = "seed"; /* octet_string */

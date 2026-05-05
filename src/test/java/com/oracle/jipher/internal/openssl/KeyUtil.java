@@ -181,6 +181,12 @@ public class KeyUtil {
         } else if (alg.equals("RSA")) {
             KeyFactory kf = KeyFactory.getInstance(alg, "SunRsaSign");
             return kf.getKeySpec(kf.generatePrivate(new PKCS8EncodedKeySpec(encoding)), RSAPrivateCrtKeySpec.class);
+        } else if (alg.equals("ML-KEM")) {
+            KeyFactory kf = KeyFactory.getInstance(alg, "SunJCE");
+            return kf.getKeySpec(kf.generatePrivate(new PKCS8EncodedKeySpec(encoding)), PKCS8EncodedKeySpec.class);
+        } else if (alg.equals("ML-DSA")) {
+            KeyFactory kf = KeyFactory.getInstance(alg, "SUN");
+            return kf.getKeySpec(kf.generatePrivate(new PKCS8EncodedKeySpec(encoding)), PKCS8EncodedKeySpec.class);
         } else {
             throw new Exception("Unsupported algorithm: " + alg);
         }
@@ -200,7 +206,14 @@ public class KeyUtil {
         } else if (alg.equals("RSA")) {
             KeyFactory kf = KeyFactory.getInstance(alg, "SunRsaSign");
             return kf.getKeySpec(kf.generatePublic(new X509EncodedKeySpec(encoding)), RSAPublicKeySpec.class);
-        } else {
+        } else if (alg.equals("ML-KEM")) {
+            KeyFactory kf = KeyFactory.getInstance(alg, "SunJCE");
+            return kf.getKeySpec(kf.generatePublic(new X509EncodedKeySpec(encoding)), X509EncodedKeySpec.class);
+        } else if (alg.equals("ML-DSA")) {
+            KeyFactory kf = KeyFactory.getInstance(alg, "SUN");
+            return kf.getKeySpec(kf.generatePublic(new X509EncodedKeySpec(encoding)), X509EncodedKeySpec.class);
+        }
+        else {
             throw new Exception("Unsupported algorithm: " + alg);
         }
     }
