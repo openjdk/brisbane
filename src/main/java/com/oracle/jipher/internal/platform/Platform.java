@@ -43,6 +43,8 @@ package com.oracle.jipher.internal.platform;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.oracle.jipher.internal.common.ToolkitProperties;
+
 public abstract class Platform {
 
     private final String platformName;
@@ -59,8 +61,8 @@ public abstract class Platform {
      * @return this Platform
      */
     public static Platform getPlatform() {
-        String osName = System.getProperty("os.name");
-        String osArch = System.getProperty("os.arch");
+        String osName = ToolkitProperties.getOsNameValue();
+        String osArch = ToolkitProperties.getOsArchValue();
         return getPlatform(osName, osArch);
     }
 

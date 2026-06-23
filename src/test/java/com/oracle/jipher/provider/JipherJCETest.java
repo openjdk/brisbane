@@ -364,6 +364,8 @@ public class JipherJCETest {
 
             try (MockedStatic<ToolkitProperties> MockToolkitProperties = Mockito.mockStatic(ToolkitProperties.class)) {
                 MockToolkitProperties.when(ToolkitProperties::getFipsEnforcementValue).thenReturn(Fips.EnforcementPolicy.FIPS_STRICT);
+                // Need to mock this as well, as the static mocking would otherwise pick-up default value (null) of the variable
+                MockToolkitProperties.when(ToolkitProperties::getJavaRuntimeVersionValue).thenReturn(System.getProperty("java.runtime.version"));
 
                 testServiceAlgorithmRegistration(false, false, false);
             }

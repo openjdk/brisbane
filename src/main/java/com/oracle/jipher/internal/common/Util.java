@@ -344,7 +344,7 @@ public final class Util {
      * @return the major component of the java.runtime.version
      */
     public static int getJavaRuntimeMajorVersion() throws ParseException {
-        String runtimeVersionString = System.getProperty("java.runtime.version");
+        String runtimeVersionString = ToolkitProperties.getJavaRuntimeVersionValue();
         int offset = runtimeVersionString.startsWith("1.") ? 2 : 0;
         Pattern pattern = Pattern.compile("^\\d+");
         Matcher matcher = pattern.matcher(runtimeVersionString.substring(offset));

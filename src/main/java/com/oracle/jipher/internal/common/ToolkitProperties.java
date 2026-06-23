@@ -48,6 +48,10 @@ public class ToolkitProperties {
 
     private ToolkitProperties() {}
 
+    private static final String OS_NAME_PROPERTY = "os.name";
+    private static final String OS_ARCH_PROPERTY = "os.arch";
+    private static final String JAVA_RUNTIME_VERSION_PROPERTY = "java.runtime.version";
+
     private static final String JDK_DEFAULT_KEY_SIZE_PROPERTY = "jdk.security.defaultKeySize";
     private static final int JIPHER_PBKDF2_DEFAULT_MINIMUM_PASSWORD_LENGTH = 8;
     private static final int JIPHER_PBKDF2_DEFAULT_MAXIMUM_ITERATION_COUNT = 10_000_000;
@@ -69,6 +73,10 @@ public class ToolkitProperties {
     private static final String JIPHER_CIPHER_AEAD_STREAM_PROPERTY = "jipher.cipher.AEAD.stream";
     private static final String JIPHER_PBKDF2_MINIMUM_PASSWORD_LENGTH_PROPERTY = "jipher.pbkdf2.minimumPasswordLength";
     private static final String JIPHER_PBKDF2_MAXIMUM_ITERATION_COUNT_PROPERTY = "jipher.pbkdf2.maximumIterationCount";
+
+    private static final String OS_NAME_VALUE = systemProperty(OS_NAME_PROPERTY);
+    private static final String OS_ARCH_VALUE = systemProperty(OS_ARCH_PROPERTY);
+    private static final String JAVA_RUNTIME_VERSION_VALUE = systemProperty(JAVA_RUNTIME_VERSION_PROPERTY);
 
     private static final String JIPHER_OPENSSL_DIR_VALUE = systemProperty(JIPHER_OPENSSL_DIR_PROPERTY);
     private static final boolean JIPHER_OPENSSL_USE_OS_INSTANCE_VALUE =  Boolean.getBoolean(JIPHER_OPENSSL_USE_OS_INSTANCE_PROPERTY);
@@ -102,6 +110,18 @@ public class ToolkitProperties {
 
     private static String systemProperty(final String property, final String defaultVal) {
         return System.getProperty(property, defaultVal);
+    }
+
+    public static String getOsNameValue() {
+        return OS_NAME_VALUE;
+    }
+
+    public static String getOsArchValue() {
+        return OS_ARCH_VALUE;
+    }
+
+    public static String getJavaRuntimeVersionValue() {
+        return JAVA_RUNTIME_VERSION_VALUE;
     }
 
     public static String getJavaKeyLengths() {
