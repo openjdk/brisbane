@@ -60,7 +60,7 @@ public class Debug {
     }
 
     public static boolean isEnabled(String type) {
-        String debugVal = System.getProperty("java.security.debug");
+        String debugVal = ToolkitProperties.getJavaSecurityDebugValue();
         if (debugVal == null) {
             return false;
         }

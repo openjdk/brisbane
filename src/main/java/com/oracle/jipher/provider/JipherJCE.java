@@ -729,7 +729,7 @@ public final class JipherJCE extends Provider {
         }
 
         // Signature Implementations
-        if (System.getProperty("java.vendor").startsWith("Oracle") && getJavaRuntimeMajorVersion() < 26) {
+        if (ToolkitProperties.getJavaVendorValue().startsWith("Oracle") && getJavaRuntimeMajorVersion() < 26) {
             // Workaround: Signal javax.crypto.JarVerifier class that Signature support is operational
             putService("Signature", "MD5WithRSA",
                     DummyJCEVerifierSignature.class.getName(), DummyJCEVerifierSignature::new);

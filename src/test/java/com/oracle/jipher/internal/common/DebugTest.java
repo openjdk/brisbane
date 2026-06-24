@@ -45,6 +45,8 @@ import java.io.PrintStream;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -55,38 +57,38 @@ public class DebugTest {
 
     @Test
     public void isEnabledTest() throws Exception {
-        System.clearProperty("java.security.debug");
-        Assert.assertFalse(Debug.isEnabled("jipher"));
+        try (MockedStatic<ToolkitProperties> MockToolkitProperties = Mockito.mockStatic(ToolkitProperties.class)) {
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn(null);
+            Assert.assertFalse(Debug.isEnabled("jipher"));
 
-        System.setProperty("java.security.debug", "other");
-        Assert.assertFalse(Debug.isEnabled("jipher"));
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("other");
+            Assert.assertFalse(Debug.isEnabled("jipher"));
 
-        System.setProperty("java.security.debug", "jipher");
-        Assert.assertTrue(Debug.isEnabled("jipher"));
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("jipher");
+            Assert.assertTrue(Debug.isEnabled("jipher"));
 
-        System.setProperty("java.security.debug", "all");
-        Assert.assertTrue(Debug.isEnabled("jipher"));
-
-        System.clearProperty("java.security.debug");
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("all");
+            Assert.assertTrue(Debug.isEnabled("jipher"));
+        }
     }
 
     @Test
     public void getInstanceTest() throws Exception {
         Debug debug;
 
-        System.clearProperty("java.security.debug");
-        assertEquals(Debug.NONE, Debug.getInstance("jipher"));
+        try (MockedStatic<ToolkitProperties> MockToolkitProperties = Mockito.mockStatic(ToolkitProperties.class)) {
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn(null);
+            assertEquals(Debug.NONE, Debug.getInstance("jipher"));
 
-        System.setProperty("java.security.debug", "other");
-        assertEquals(Debug.NONE, Debug.getInstance("jipher"));
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("other");
+            assertEquals(Debug.NONE, Debug.getInstance("jipher"));
 
-        System.setProperty("java.security.debug", "jipher");
-        assertNotEquals(Debug.NONE, Debug.getInstance("jipher"));
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("jipher");
+            assertNotEquals(Debug.NONE, Debug.getInstance("jipher"));
 
-        System.setProperty("java.security.debug", "all");
-        assertNotEquals(Debug.NONE, Debug.getInstance("jipher"));
-
-        System.clearProperty("java.security.debug");
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("all");
+            assertNotEquals(Debug.NONE, Debug.getInstance("jipher"));
+        }
     }
 
     @Test
@@ -99,13 +101,13 @@ public class DebugTest {
         System.setErr(new PrintStream(errContent));
 
         // Test outputting a message
-        System.setProperty("java.security.debug", "jipher");
-        Debug.getInstance("jipher").println(() -> MESSAGE);
-        Assert.assertTrue(errContent.toString().contains("jipher: " + MESSAGE));
+        try (MockedStatic<ToolkitProperties> MockToolkitProperties = Mockito.mockStatic(ToolkitProperties.class)) {
+            MockToolkitProperties.when(ToolkitProperties::getJavaSecurityDebugValue).thenReturn("jipher");
+            Debug.getInstance("jipher").println(() -> MESSAGE);
+            Assert.assertTrue(errContent.toString().contains("jipher: " + MESSAGE));
+        }
 
         // Restore original  system error stream
         System.setErr(originalSystemErr);
-
-        System.clearProperty("java.security.debug");
     }
 }

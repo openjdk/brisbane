@@ -50,6 +50,8 @@ public class ToolkitProperties {
 
     private static final String OS_NAME_PROPERTY = "os.name";
     private static final String OS_ARCH_PROPERTY = "os.arch";
+    private static final String JAVA_SECURITY_DEBUG_PROPERTY = "java.security.debug";
+    private static final String JAVA_VENDOR_PROPERTY = "java.vendor";
     private static final String JAVA_RUNTIME_VERSION_PROPERTY = "java.runtime.version";
 
     private static final String JDK_DEFAULT_KEY_SIZE_PROPERTY = "jdk.security.defaultKeySize";
@@ -76,6 +78,8 @@ public class ToolkitProperties {
 
     private static final String OS_NAME_VALUE = systemProperty(OS_NAME_PROPERTY);
     private static final String OS_ARCH_VALUE = systemProperty(OS_ARCH_PROPERTY);
+    private static final String JAVA_SECURITY_DEBUG_VALUE = systemProperty(JAVA_SECURITY_DEBUG_PROPERTY);
+    private static final String JAVA_VENDOR_VALUE = systemProperty(JAVA_VENDOR_PROPERTY);
     private static final String JAVA_RUNTIME_VERSION_VALUE = systemProperty(JAVA_RUNTIME_VERSION_PROPERTY);
 
     private static final String JIPHER_OPENSSL_DIR_VALUE = systemProperty(JIPHER_OPENSSL_DIR_PROPERTY);
@@ -118,6 +122,14 @@ public class ToolkitProperties {
 
     public static String getOsArchValue() {
         return OS_ARCH_VALUE;
+    }
+
+    public static String getJavaSecurityDebugValue() {
+        return JAVA_SECURITY_DEBUG_VALUE;
+    }
+
+    public static String getJavaVendorValue() {
+        return JAVA_VENDOR_VALUE;
     }
 
     public static String getJavaRuntimeVersionValue() {
