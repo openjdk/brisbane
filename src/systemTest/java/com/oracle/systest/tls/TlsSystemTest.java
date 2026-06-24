@@ -133,7 +133,7 @@ public class TlsSystemTest {
     @BeforeClass
     public static void setUp() throws Exception {
         // Only test with MLKEM named groups if the OpenSSL FIPS provider
-        // that Jipher will use during the test supports MKLEM
+        // that Jipher will use during the test supports MLKEM
         if (System.getProperty("jdk.tls.namedGroups", "").toUpperCase().contains("MLKEM")) {
             assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
         }
