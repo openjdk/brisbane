@@ -51,18 +51,35 @@ public class FipsProviderInfoUtil {
     static private final boolean SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
     static private final boolean FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED;
     static private final int     KDF_MIN_PWD_LENGTH;
+    private static final boolean ML_KEM_IS_SUPPORTED;
+    private static final boolean ML_DSA_IS_SUPPORTED;
+
 
     static {
         NAME = FipsProviderInfo.getNameString();
         VERSION = FipsProviderInfo.getVersionString();
+        // Drop build number from version string
+        String patchVersion = VERSION.split("-")[0];
+        String[] versionComponents = patchVersion.split("\\.");
+        boolean isPQCSupported = false;
+        if (versionComponents.length >= 2) {
+            try {
+                int major = Integer.valueOf(versionComponents[0]);
+                int minor = Integer.valueOf(versionComponents[1]);
+                // FIPS certified support for PQC requires minor version >=5.
+                isPQCSupported = (major == 3 && minor >= 5);
+            } catch (NumberFormatException e) {
+                isPQCSupported = false;
+            }
+        }
+        ML_KEM_IS_SUPPORTED = isPQCSupported;
+        ML_DSA_IS_SUPPORTED = isPQCSupported;
+
 
         // Note: The OpenSSL FIPS provider used on version 9 of these Linux distributions is also used on version 10.
         boolean isRHDerivative = NAME.contains("Red Hat Enterprise Linux") || NAME.contains("Oracle Linux");
 
         if (isRHDerivative) {
-            // Drop build number from version string
-            String patchVersion = VERSION.split("-")[0];
-
             // These capabilities apply to version 3.0.7 of the FIPS provider distributed with these Linux distributions.
             // This class will need to be updated to support any future version.
             assertEquals("3.0.7", patchVersion);
@@ -105,5 +122,11 @@ public class FipsProviderInfoUtil {
 
     public static int getKDFMinPwdLen() {
         return KDF_MIN_PWD_LENGTH;
+    }
+    public static boolean isMLKEMSupported() {
+        return ML_KEM_IS_SUPPORTED;
+    }
+    public static boolean isMLDSASupported() {
+        return ML_DSA_IS_SUPPORTED;
     }
 }

@@ -54,6 +54,7 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.DSAParameterSpec;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
+import java.security.spec.NamedParameterSpec;
 import java.security.spec.RSAKeyGenParameterSpec;
 import javax.crypto.spec.DHParameterSpec;
 
@@ -65,6 +66,8 @@ import com.oracle.jipher.internal.key.JceDhPrivateKey;
 import com.oracle.jipher.internal.key.JceDhPublicKey;
 import com.oracle.jipher.internal.key.JceEcPrivateKey;
 import com.oracle.jipher.internal.key.JceEcPublicKey;
+import com.oracle.jipher.internal.key.JceMlPrivateKey;
+import com.oracle.jipher.internal.key.JceMlPublicKey;
 import com.oracle.jipher.internal.key.JceRsaPrivateKey;
 import com.oracle.jipher.internal.key.JceRsaPublicKey;
 import com.oracle.jipher.internal.openssl.EVP_PKEY;
@@ -72,9 +75,9 @@ import com.oracle.jipher.internal.openssl.EcCurve;
 import com.oracle.jipher.internal.openssl.OsslArena;
 import com.oracle.jipher.internal.openssl.Pkey;
 import com.oracle.jipher.internal.openssl.PkeyCtx;
-import com.oracle.jipher.internal.spi.DHFIPSParameterSpec;
 
 import static com.oracle.jipher.internal.common.InputChecks.isNullOrZeroOrNegative;
+
 
 /**
  * Parent class for {@link KeyPairGenerator} algorithm implementations.
@@ -153,7 +156,7 @@ public abstract class KeyPairGen extends KeyPairGenerator {
         @Override
         PkeyCtx.KeyGen createKeyGen(OsslArena arena) {
             PkeyCtx.RsaKeyGen ctx = new PkeyCtx.RsaKeyGen(arena);
-            ctx.setParams(this.modulusSize, pubExp);
+            ctx.setParams(this.modulusSize, this.pubExp);
             return ctx;
         }
 
@@ -366,4 +369,190 @@ public abstract class KeyPairGen extends KeyPairGenerator {
             }
         }
     }
+
+    /**
+     * ML-KEM KeyPairGeneratorSpi implementation.
+     */
+    public static sealed class MlKem extends KeyPairGen permits MlKem512, MlKem768, MlKem1024 {
+
+        private String mlKEMAlgo;
+        private final boolean isGeneric;
+
+        public MlKem() {
+            super("ML-KEM");
+            this.mlKEMAlgo = PQCParameterSpecs.ML_KEM_768.getName(); //default to ML-KEM-768.
+            this.isGeneric = true;
+        }
+
+        MlKem(NamedParameterSpec paramSpec) {
+            super("ML-KEM");
+            this.mlKEMAlgo = paramSpec.getName();
+            this.isGeneric = false;
+        }
+
+        @Override
+        public void initialize(int keysize, SecureRandom random) {
+            throw new InvalidParameterException("Use NamedParameterSpec to initialize.");
+        }
+
+        @Override
+        public void initialize(AlgorithmParameterSpec params, SecureRandom random)
+                throws InvalidAlgorithmParameterException {
+
+            // Use defaults.
+            if (params == null) {
+                return;
+            }
+            if (!(params instanceof NamedParameterSpec)) {
+               throw new InvalidAlgorithmParameterException("Unsupported Parameters of type: " + params.getClass().getName());
+            }
+
+            NamedParameterSpec namedParamSpec = (NamedParameterSpec)params;
+
+            if (this.isGeneric) {
+                // In generic construction, check if the params are from KEM family.
+                if (!PQCParameterSpecs.isMLKEMSpec(namedParamSpec)) {
+                    throw new InvalidAlgorithmParameterException("Unsupported NamedParameterSpec type: " + namedParamSpec.getName());
+                }
+                this.mlKEMAlgo = namedParamSpec.getName();
+            } else {
+                // If construction is specific to ML-KEM variant, check that.
+                if (!this.mlKEMAlgo.equals(namedParamSpec.getName())) {
+                    throw new InvalidAlgorithmParameterException("Unsupported parameter set name: " + namedParamSpec.getName());
+                }
+            }
+        }
+
+        @Override
+        public void initialize(AlgorithmParameterSpec params)
+                throws InvalidAlgorithmParameterException {
+            this.initialize(params, null);
+        }
+
+        @Override
+        PkeyCtx.KeyGen createKeyGen(OsslArena arena) {
+            PkeyCtx.KeyGen ctx = new PkeyCtx.MLKeyGen(this.mlKEMAlgo, arena);
+            return ctx;
+        }
+
+        @Override
+        PublicKey createPublicKey(Pkey pub) throws InvalidKeyException {
+            return new JceMlPublicKey.JceMlKemPublicKey(this.mlKEMAlgo, pub);
+        }
+
+        @Override
+        PrivateKey createPrivateKey(Pkey priv) throws InvalidKeyException {
+            return new JceMlPrivateKey.JceMlKemPrivateKey(this.mlKEMAlgo, priv);
+        }
+    }
+
+    public static final class MlKem512 extends MlKem {
+        public MlKem512() {
+            super(PQCParameterSpecs.ML_KEM_512);
+        }
+    }
+
+    public static final class MlKem768 extends MlKem {
+        public MlKem768() {
+            super(PQCParameterSpecs.ML_KEM_768);
+        }
+    }
+
+    public static final class MlKem1024 extends MlKem {
+        public MlKem1024() {
+            super(PQCParameterSpecs.ML_KEM_1024);
+        }
+    }
+
+    /**
+     * ML-DSA KeyPairGeneratorSpi implementation.
+     */
+    public static sealed class MlDsa extends KeyPairGen permits MlDsa44, MlDsa65, MlDsa87 {
+
+        private String mlDSAAlgo;
+        private final boolean isGeneric;
+
+        public MlDsa() {
+            super("ML-DSA");
+            this.mlDSAAlgo = PQCParameterSpecs.ML_DSA_65.getName();
+            this.isGeneric = true;
+        }
+
+        MlDsa(NamedParameterSpec paramSpec) {
+            super("ML-DSA");
+            this.mlDSAAlgo = paramSpec.getName();
+            this.isGeneric = false;
+        }
+
+        @Override
+        public void initialize(int keysize, SecureRandom random) {
+            throw new InvalidParameterException("Use NamedParameterSpec to initialize.");
+        }
+
+        @Override
+        public void initialize(AlgorithmParameterSpec params)
+                throws InvalidAlgorithmParameterException {
+            initialize(params, null);
+        }
+
+        @Override
+        public void initialize(AlgorithmParameterSpec params, SecureRandom random)
+                throws InvalidAlgorithmParameterException {
+
+            if (params == null) {
+                return;
+            }
+            if (!(params instanceof NamedParameterSpec)) {
+               throw new InvalidAlgorithmParameterException();
+            }
+
+            NamedParameterSpec namedParamSpec = (NamedParameterSpec)params;
+
+            if (this.isGeneric) {
+                if (!PQCParameterSpecs.isMLDSASpec(namedParamSpec)) {
+                    throw new InvalidAlgorithmParameterException();
+                }
+                this.mlDSAAlgo = namedParamSpec.getName();
+            } else {
+                if (!mlDSAAlgo.equals(namedParamSpec.getName())) {
+                    throw new InvalidAlgorithmParameterException("Unsupported parameter set name: " + namedParamSpec.getName());
+                }
+            }
+        }
+
+        @Override
+        PkeyCtx.KeyGen createKeyGen(OsslArena arena) {
+            PkeyCtx.KeyGen ctx = new PkeyCtx.MLKeyGen(this.mlDSAAlgo, arena);
+            return ctx;
+        }
+
+        @Override
+        PublicKey createPublicKey(Pkey pub) throws InvalidKeyException {
+            return new JceMlPublicKey.JceMlDsaPublicKey(this.mlDSAAlgo, pub);
+        }
+
+        @Override
+        PrivateKey createPrivateKey(Pkey priv) throws InvalidKeyException {
+            return new JceMlPrivateKey.JceMlDsaPrivateKey(this.mlDSAAlgo, priv);
+        }
+    }
+
+    public static final class MlDsa44 extends MlDsa {
+        public MlDsa44() {
+            super(PQCParameterSpecs.ML_DSA_44);
+        }
+    }
+
+    public static final class MlDsa65 extends MlDsa {
+        public MlDsa65() {
+            super(PQCParameterSpecs.ML_DSA_65);
+        }
+    }
+
+    public static final class MlDsa87 extends MlDsa {
+        public MlDsa87() {
+            super(PQCParameterSpecs.ML_DSA_87);
+        }
+    }
+
 }

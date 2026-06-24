@@ -38,22 +38,34 @@
  * SOFTWARE.
  */
 
-package com.oracle.jipher.internal.openssl;
+package com.oracle.jipher.internal.key;
+
+import java.util.Optional;
 
 import org.junit.Test;
 
-import static org.junit.Assert.assertNull;
+import com.oracle.jipher.internal.key.JceMlKey.Algorithm;
+
 import static org.junit.Assert.assertTrue;
 
-public class OpenSsslValidatorTest {
+
+public class JceMlKeyTest {
 
     @Test
-    public void isAvailable() {
-        assertTrue(OpenSslValidator.isAvailable());
+    public void testFind() {
+        Optional<Algorithm> mlDsa = JceMlKey.find("ML-DSA");
+        assertTrue(mlDsa.isEmpty());
+        Optional<Algorithm> mlKem = JceMlKey.find("ML-KEM");
+        assertTrue(mlKem.isEmpty());
     }
 
-    @Test
-    public void loadingException() {
-        assertNull(OpenSslValidator.loadingException());
+    @Test (expected = IllegalArgumentException.class)
+    public void testGetStrAlgIdMlDsa() {
+        JceMlKey.getStrAlgId("ML-DSA");
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testGetStrAlgIdMlKem() {
+        JceMlKey.getStrAlgId("ML-KEM");
     }
 }

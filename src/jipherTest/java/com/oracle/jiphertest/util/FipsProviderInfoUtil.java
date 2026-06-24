@@ -54,7 +54,8 @@ public class FipsProviderInfoUtil {
     private static final boolean SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
     private static final boolean FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED;
     private static final int     KDF_MIN_PWD_LEN;
-
+    private static final boolean ML_KEM_IS_SUPPORTED;
+    private static final boolean ML_DSA_IS_SUPPORTED;
 
     static {
         // Determine the OpenSSL FIPS provider name and version:
@@ -70,6 +71,14 @@ public class FipsProviderInfoUtil {
         MAJOR_VERSION = Integer.parseInt(patchVersionParts[0]);
         MINOR_VERSION = patchVersionParts.length > 1 ? Integer.parseInt(patchVersionParts[1]) : 0;
         PATCH_VERSION = patchVersionParts.length > 2 ?Integer.parseInt(patchVersionParts[2]) : 0;
+
+        if (MAJOR_VERSION >=3 && MINOR_VERSION >=5) {
+            ML_KEM_IS_SUPPORTED = true;
+            ML_DSA_IS_SUPPORTED = true;
+        } else {
+            ML_KEM_IS_SUPPORTED = false;
+            ML_DSA_IS_SUPPORTED = false;
+        }
 
         // Note: The OpenSSL FIPS provider used on version 9 of these Linux distributions is also used on version 10.
         boolean isRHDerivative = NAME.contains("Red Hat Enterprise Linux") || NAME.contains("Oracle Linux");
@@ -129,5 +138,11 @@ public class FipsProviderInfoUtil {
 
     public static int getKDFMinPwdLen() {
         return KDF_MIN_PWD_LEN;
+    }
+    public static boolean isMlKemSupported() {
+        return ML_KEM_IS_SUPPORTED;
+    }
+    public static boolean isMlDsaSupported() {
+        return ML_DSA_IS_SUPPORTED;
     }
 }

@@ -91,6 +91,13 @@ public abstract class PkeyCtx {
             // Nothing to do
         }
 
+        /*
+         * Generate Pkey private key.
+         */
+        Pkey generatePkey() {
+            return new Pkey(this.type, Pkey.ContentType.KEY_PAIR, this.evpPkeyCtx::generate);
+        }
+
         /**
          * Generate a Pkey pair with the given parameters.
          * @return an array containing the private key Pkey and the public key Pkey
@@ -102,7 +109,7 @@ public abstract class PkeyCtx {
             try {
                 this.evpPkeyCtx.keygenInit();
                 initParams();
-                pkey = new Pkey(this.type, Pkey.ContentType.KEY_PAIR, this.evpPkeyCtx::generate);
+                pkey = generatePkey();
                 Pkey[] kp = new Pkey[] {
                     pkey, pkey.createPub()
                 };
@@ -174,6 +181,23 @@ public abstract class PkeyCtx {
         }
     }
 
+    /*
+     * Base class for ML* KeyGen.
+     */
+    public static final class MLKeyGen extends KeyGen {
+        private final String mlAlgo;
+
+        public MLKeyGen(String mlAlgo, OsslArena arena) {
+            super(LibCtx.newPkeyCtx(mlAlgo, arena), Pkey.KeyType.ML);
+            this.mlAlgo = mlAlgo;
+        }
+
+        @Override
+        Pkey generatePkey() {
+            return new Pkey(this.type, this.mlAlgo, Pkey.ContentType.KEY_PAIR, this.evpPkeyCtx::generate);
+        }
+    }
+
     /**
      * Derive / key agree context object.
      */
@@ -236,9 +260,29 @@ public abstract class PkeyCtx {
             }
         }
 
+        public void signMessageInit() throws InvalidKeyException {
+            try {
+                assert (this.evpPkeyCtx.isA("ML-DSA-44") || this.evpPkeyCtx.isA("ML-DSA-65")
+                        || this.evpPkeyCtx.isA("ML-DSA-87"));
+                this.evpPkeyCtx.signMessageInit();
+            } catch (OpenSslException e) {
+                throw new InvalidKeyException("Failed to initialize pkey ctx for signing", e);
+            }
+        }
+
         public void verifyInit() throws InvalidKeyException {
             try {
                 this.evpPkeyCtx.verifyInit();
+            } catch (OpenSslException e) {
+                throw new InvalidKeyException("Failed to initialize pkey ctx for verifying", e);
+            }
+        }
+
+        public void verifyMessageInit() throws InvalidKeyException {
+            try {
+                assert (this.evpPkeyCtx.isA("ML-DSA-44") || this.evpPkeyCtx.isA("ML-DSA-65")
+                        || this.evpPkeyCtx.isA("ML-DSA-87"));
+                this.evpPkeyCtx.verifyMessageInit();
             } catch (OpenSslException e) {
                 throw new InvalidKeyException("Failed to initialize pkey ctx for verifying", e);
             }
@@ -320,4 +364,39 @@ public abstract class PkeyCtx {
             }
         }
     }
+    /**
+     * ML-KEM Encap/Decap context.
+     */
+    public static final class EncapsulatorDecapsulator extends PkeyCtx {
+
+        public EncapsulatorDecapsulator(Pkey pkey, OsslArena arena) throws ProviderException {
+            super(LibCtx.newPkeyCtx(pkey.getEvpPkey(), arena));
+        }
+
+        /*
+         * Returns the encapsulated key (index 0) and the secret (index 1) in
+         * order.
+         */
+        public byte[][] encap() {
+            this.evpPkeyCtx.encapsulateInit();
+            int[] sizes = this.evpPkeyCtx.encapsulate(null, 0, null, 0);
+            byte[] wrappedKey = new byte[sizes[0]];
+            byte[] genKey = new byte[sizes[1]];
+            this.evpPkeyCtx.encapsulate(wrappedKey, 0, genKey, 0);
+            return new byte[][] {wrappedKey, genKey};
+        }
+
+        /*
+         * Return the secret from an encapsulation.
+         */
+        public byte[] decap(byte[] encapsulated) {
+            this.evpPkeyCtx.decapsulateInit();
+            // This will be 32 for all ML-KEM variants.
+            int secretKeyLen = this.evpPkeyCtx.decapsulate(encapsulated, 0, encapsulated.length, null, 0);
+            byte[] secret = new byte[secretKeyLen];
+            this.evpPkeyCtx.decapsulate(encapsulated, 0, encapsulated.length, secret, 0);
+            return secret;
+        }
+    }
+
 }

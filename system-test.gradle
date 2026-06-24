@@ -148,9 +148,6 @@ fipsEnforcementPolicies.each { policy ->
         testClassesDirs = sourceSets.systemTest.output
         classpath = sourceSets.systemTest.runtimeClasspath
 
-        // From JDK 9 onward internal JDK APIs are no longer accessible by default
-        jvmArgs += '--add-exports=java.base/sun.security.internal.spec=com.oracle.jipher,com.oracle.jiphertest.other'
-
         // Suppress restricted method warnings related to accessing methods considered to be unsafe
         // See https://docs.oracle.com/en/java/javase/25/core/restricted-methods.html
         jvmArgs += '--enable-native-access=com.oracle.jipher'
@@ -247,12 +244,6 @@ tlsProvConfigs.each { config ->
 
         forkEvery = 1
 
-        libConfigs.each { lib_cfg ->
-            def lib_cfg_props = lib_cfg.getValue()
-            lib_cfg_props.each { kv ->
-                systemProperty kv.getKey(), kv.getValue()
-            }
-        }
         systemProperty 'java.security.properties', "$projectDir/config/java.security/${clientCfg}.java.security"
         systemProperty 'security.config.client', clientCfg
         systemProperty 'security.config.server', serverCfg
@@ -270,6 +261,60 @@ tasks.register('jsseTest') {
         dependsOn "jsseTest_(${prov_cfg[0]})"
     }
 }
+
+def namedGroups = ['SecP256r1']
+
+if (TEST_PQC_GROUPS) {
+    namedGroups += [
+            'X25519MLKEM768',
+            'SecP256r1MLKEM768',
+            'SecP384r1MLKEM1024'
+    ]
+}
+
+namedGroups.each { namedGroup ->
+    tlsProvConfigs.each { config ->
+        def configName = config[0]
+        def clientCfg = config[1]
+        def serverCfg = config[2]
+        tasks.register("jsseTest_(${configName})_${namedGroup}", Test) {
+            description = "Run JSSE test for provider cfg ${configName} with named group ${namedGroup}"
+            group = 'deploy-test'
+            testClassesDirs = sourceSets.systemTest.output
+            classpath = sourceSets.systemTest.runtimeClasspath
+
+            // From JDK 9 onward internal JDK APIs are no longer accessible by default
+            jvmArgs += '--add-exports=java.base/sun.security.internal.spec=com.oracle.jipher'
+            jvmArgs += '--add-exports=java.base/sun.security.util=com.oracle.jipher'
+            // Suppress restricted method warnings related to accessing methods considered to be unsafe
+            // See https://docs.oracle.com/en/java/javase/25/core/restricted-methods.html
+            jvmArgs += '--enable-native-access=com.oracle.jipher'
+
+            forkEvery = 1
+
+            systemProperty 'java.security.properties', "$projectDir/config/java.security/${clientCfg}.java.security"
+            systemProperty 'security.config.client', clientCfg
+            systemProperty 'security.config.server', serverCfg
+
+            systemProperty 'jdk.tls.namedGroups', namedGroup
+
+            include 'com/oracle/systest/tls/**'
+
+            finalizedBy 'testReport'
+        }
+    }
+}
+
+tasks.register('jsseTest_namedGroups') {
+    description = 'Run JSSE tests for all TLS provider and library configurations and namedGroups'
+    group = 'deploy-test'
+    namedGroups.each { namedGroup ->
+        tlsProvConfigs.each { prov_cfg ->
+            dependsOn "jsseTest_(${prov_cfg[0]})_${namedGroup}"
+        }
+    }
+}
+
 
 classLoaderConfigs.each { name_props ->
     def cfg_name = name_props.getKey()
@@ -363,7 +408,7 @@ tasks.register('sanctionedVersionsTest') {
 tasks.register('systemTest') {
     description = 'Run system tests ( config tests and jar tests )'
     group = 'deploy-test'
-    dependsOn 'fipsTest', 'configTest', 'jsseTest', 'classloaderTest', 'serviceloaderTest', 'sanctionedVersionsTest'
+    dependsOn 'fipsTest', 'configTest', 'jsseTest', 'jsseTest_namedGroups', 'classloaderTest', 'serviceloaderTest', 'sanctionedVersionsTest'
 }
 
 

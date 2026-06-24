@@ -38,22 +38,47 @@
  * SOFTWARE.
  */
 
-package com.oracle.jipher.internal.openssl;
+package com.oracle.jiphertest.testdata;
 
-import org.junit.Test;
+import static com.oracle.jiphertest.util.TestUtil.hexStringToByteArray;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+public class KemEncapsulatedTestVector extends AbstractTestDataItem {
 
-public class OpenSsslValidatorTest {
+    private String secretHex;
+    private String encapHex;
+    private String keyId;
+    private String pubHex;
+    private String privHex;
 
-    @Test
-    public void isAvailable() {
-        assertTrue(OpenSslValidator.isAvailable());
+
+    private KemEncapsulatedTestVector(String alg, String secretHex, String encapHex, String keyId, String pubHex,
+            String privHex) {
+        super(alg);
+        this.secretHex = secretHex;
+        this.encapHex = encapHex;
+        this.keyId = keyId;
+        this.pubHex = pubHex;
+        this.privHex = privHex;
     }
 
-    @Test
-    public void loadingException() {
-        assertNull(OpenSslValidator.loadingException());
+    public String getKeyId() {
+        return this.keyId;
     }
+
+    @Override
+    public byte[] getData() {
+        return hexStringToByteArray(this.secretHex);
+    }
+
+    public byte[] getEncapsulated() {
+        return hexStringToByteArray(encapHex);
+    }
+
+    public byte[] getPubBytes() {
+        return hexStringToByteArray(this.pubHex);
+    }
+    public byte[] getPrivBytes() {
+        return hexStringToByteArray(this.privHex);
+    }
+
 }

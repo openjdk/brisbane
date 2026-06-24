@@ -43,7 +43,8 @@ apply from: 'jacoco.gradle'
 import java.nio.file.Files
 import java.nio.file.Paths
 
-project.ext.TEST_JAVA_VER = (project.findProperty('TEST_JAVA_VER')?.toInteger()) ?: project.ext.javaLanguageVersion
+project.ext.TEST_JAVA_VER = project.findProperty('TEST_JAVA_VER')?.toInteger() ?: project.ext.javaLanguageVersion
+project.ext.TEST_PQC_GROUPS = project.findProperty('TEST_PQC_GROUPS')?.toString()?.toBoolean() ?: project.ext.TEST_JAVA_VER >= 27
 
 project.ext.PLATFORM = determinePlatform()
 
@@ -198,16 +199,20 @@ tasks.register('runMainClass', JavaExec) {
     }
 }
 
-tasks.withType(Test) { task ->
-
+tasks.withType(Test).configureEach  { task ->
     javaLauncher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(project.ext.TEST_JAVA_VER)
     }
-
-    jvmArgs += '-Xmx1024M'
+    //Smaller memory for Tests run in their own forked JVM.
+    if (task.name == 'needForkTest') {
+        jvmArgs += '-Xmx256M'
+    } else {
+        jvmArgs += '-Xmx1024M'
+    }
     // From JDK 9 onward internal JDK APIs are no longer accessible by default
     jvmArgs += '--add-exports=java.base/sun.security.internal.interfaces=ALL-UNNAMED'
     jvmArgs += '--add-exports=java.base/sun.security.internal.spec=ALL-UNNAMED'
+    jvmArgs += '--add-exports=java.base/sun.security.util=ALL-UNNAMED'
     // com.oracle.test.integration.tls.TlsTest uses sun.security.provider.X509Factory
     jvmArgs += '--add-exports=java.base/sun.security.provider=ALL-UNNAMED'
     // Suppress restricted method warnings related to accessing methods considered to be unsafe.
@@ -322,6 +327,19 @@ tasks.register('lifeCycleHookTest', Test) {
 }
 
 project.ext.commonIntegrationTestConfig =  {
+
+    group = 'verification'
+    testClassesDirs = sourceSets.intTest.output.classesDirs
+    classpath = sourceSets.intTest.runtimeClasspath
+    exclude '**/*Suite.class'
+    if (TEST_JAVA_VER < 25) {
+        exclude '**/kdf/**'
+    }
+    gradle.taskGraph.whenReady {
+        if (it.hasTask(':sanity')) {
+            jacoco { enabled = true }
+        }
+    }
     // Black box test: Classes are listed on module path and thus are in named modules.
 
     // From JDK 9 onward internal JDK APIs are no longer accessible by default
@@ -341,23 +359,26 @@ project.ext.commonIntegrationTestConfig =  {
 
 tasks.register('integrationTest', Test) {
     description = 'Runs integration tests.'
-    group = 'verification'
-    testClassesDirs = sourceSets.intTest.output.classesDirs
-    classpath = sourceSets.intTest.runtimeClasspath
     configure project.ext.commonIntegrationTestConfig
-    useJUnitPlatform { includeEngines 'junit-jupiter', 'junit-vintage' }
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter', 'junit-vintage'
+        excludeTags 'needFork'
+    }
     mustRunAfter test
-    finalizedBy 'testReport'
+    finalizedBy 'needForkTest'
+}
 
-    exclude '**/*Suite.class'
-    if (TEST_JAVA_VER < 25) {
-        exclude '**/kdf/**'
+tasks.register('needForkTest', Test) {
+    description = 'Runs integration tests which need a separate JVM.'
+    configure project.ext.commonIntegrationTestConfig
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter'
+        includeTags 'needFork'
     }
-    gradle.taskGraph.whenReady {
-        if (it.hasTask(':sanity')) {
-            jacoco { enabled = true }
-        }
-    }
+/*  Uncomment this when we have tests that need a separate VM to run.
+    forkEvery = 1
+    maxParallelForks = 4 */
+    finalizedBy 'testReport'
 }
 
 tasks.register('leakTest', Test) {
@@ -390,7 +411,7 @@ tasks.register('leakTest', Test) {
 }
 
 jacocoTestReport {
-    dependsOn lifeCycleHookTest, integrationTest // jacocoTestReport consumes the output of lifeCycleHookTest & integrationTest
+    dependsOn lifeCycleHookTest, integrationTest,  needForkTest// jacocoTestReport consumes the output of lifeCycleHookTest,integrationTest & needForkTest
 }
 
 tasks.register('sanityClean') {

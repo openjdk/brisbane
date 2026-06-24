@@ -53,19 +53,29 @@ import com.oracle.jipher.internal.fips.Fips;
 import com.oracle.jipher.internal.key.JceDsaPublicKey;
 import com.oracle.jipher.internal.key.JceEcPrivateKey;
 import com.oracle.jipher.internal.key.JceEcPublicKey;
+import com.oracle.jipher.internal.key.JceMlPrivateKey.JceMlDsaPrivateKey;
+import com.oracle.jipher.internal.key.JceMlPublicKey.JceMlDsaPublicKey;
 import com.oracle.jipher.internal.key.JceRsaPrivateKey;
 import com.oracle.jipher.internal.key.JceRsaPublicKey;
 import com.oracle.jipher.internal.openssl.OsslArena;
 import com.oracle.jipher.internal.openssl.Pkey;
 import com.oracle.jipher.internal.openssl.PkeyCtx;
+import com.oracle.jipher.internal.openssl.PkeyCtx.Signature;
+import com.oracle.jipher.internal.spi.MlKeyFactory.MlDsaKeyFactory;
+import com.oracle.jipher.internal.spi.MlKeyFactory.MlDsaKeyFactory44;
+import com.oracle.jipher.internal.spi.MlKeyFactory.MlDsaKeyFactory65;
+import com.oracle.jipher.internal.spi.MlKeyFactory.MlDsaKeyFactory87;
 
 import static com.oracle.jipher.internal.fips.CryptoOp.SIGN;
 import static com.oracle.jipher.internal.fips.CryptoOp.VERIFY;
 
+
 /**
  * Implementation of {@link SignatureSpi} for {@code NONEWith}
  * <a href=https://docs.oracle.com/en/java/javase/25/docs/specs/security/standard-names.html#signature-algorithms>Signature algorithms</a>
- * (e.g {@code NONEwithSDSA}. {@code NONEwithRSA}, {@code NONEwithECDSA}), where no digesting is done.
+ * (e.g {@code NONEwithDSA}. {@code NONEwithRSA}, {@code NONEwithECDSA}),
+ * where no digesting is done, and for {@code ML-DSA}, where all message data must be
+ * buffered and then processed as a one-shot operation.
  */
 public abstract class NoDigestSig extends SignatureSpi {
 
@@ -105,6 +115,10 @@ public abstract class NoDigestSig extends SignatureSpi {
         engineUpdate(new byte[]{b}, 0, 1);
     }
 
+    protected void signInit(PkeyCtx.Signature ctx) throws InvalidKeyException {
+        ctx.signInit();
+    }
+
     @Override
     public byte[] engineSign() throws SignatureException {
         initIfRequired();
@@ -114,7 +128,7 @@ public abstract class NoDigestSig extends SignatureSpi {
             if (bb.length == 0) {
                 throw new SignatureException("No input bytes.");
             }
-            ctx.signInit();
+            signInit(ctx);
             return ctx.sign(bb, 0, bb.length);
         } catch (InvalidKeyException e) {
             throw new SignatureException(e);
@@ -135,6 +149,10 @@ public abstract class NoDigestSig extends SignatureSpi {
         throw new UnsupportedOperationException();
     }
 
+    protected void verifyInit(PkeyCtx.Signature ctx) throws InvalidKeyException {
+        ctx.verifyInit();
+    }
+
     @Override
     protected boolean engineVerify(byte[] sigBytes, int offset, int len) throws SignatureException {
         initIfRequired();
@@ -142,7 +160,7 @@ public abstract class NoDigestSig extends SignatureSpi {
         try (OsslArena confinedArena = OsslArena.ofConfined()) {
             PkeyCtx.Signature ctx = new PkeyCtx.Signature(this.lastPkey, confinedArena);
             byte[] bb = this.tbs.toByteArray();
-            ctx.verifyInit();
+            verifyInit(ctx);
             return ctx.verify(sigBytes, offset, len, bb, 0, bb.length);
         } catch (InvalidKeyException e) {
             throw new SignatureException(e);
@@ -177,7 +195,7 @@ public abstract class NoDigestSig extends SignatureSpi {
         @Override
         protected void engineInitVerify(PublicKey publicKey) throws InvalidKeyException {
             JceRsaPublicKey pub = (JceRsaPublicKey) this.kf.engineTranslateKey(publicKey);
-            expectedLen = (pub.getModulus().bitLength() + 7) >> 3;
+            this.expectedLen = (pub.getModulus().bitLength() + 7) >> 3;
             // If pub is a java reference to the original key (no key translation took place)
             // then create a native reference to the original PKEY so that the doInit code can always
             // free the 'lastPkey' because it is not a key held by the application.
@@ -191,9 +209,9 @@ public abstract class NoDigestSig extends SignatureSpi {
             // that fails verification. The JDK providers do not consider an octet string that does not have the expected
             // signature octet length to be a valid signature. If directed to perform signature verification on
             // such an octet string the JDK providers throw a SignatureException
-            if ((len != expectedLen)) {
+            if ((len != this.expectedLen)) {
                 throw new SignatureException("Signature length not correct: got " + len + " but was expecting " +
-                        expectedLen);
+                        this.expectedLen);
             }
             return verified;
         }
@@ -263,4 +281,71 @@ public abstract class NoDigestSig extends SignatureSpi {
         }
     }
 
+    /**
+     * ML-DSA Signatures.
+     */
+    public static sealed class MLDSASig extends NoDigestSig permits MLDSASig44, MLDSASig65, MLDSASig87 {
+
+        public MLDSASig() {
+            this(new MlDsaKeyFactory());
+        }
+
+        MLDSASig(MlDsaKeyFactory kf) {
+            this.kf = kf;
+        }
+
+        private final MlDsaKeyFactory kf;
+
+        @Override
+        protected void engineInitSign(PrivateKey privateKey) throws InvalidKeyException {
+            JceMlDsaPrivateKey prv = (JceMlDsaPrivateKey) this.kf.engineTranslateKey(privateKey);
+            // If priv is a java reference to the original key (no key
+            // translation took place)
+            // then create a native reference to the original PKEY so that this
+            // service object
+            // will be independent of the original key (which the application
+            // might destroy)
+            doInit(prv == privateKey ? Pkey.createReference(prv.getPkey()) : prv.getPkey());
+        }
+
+        @Override
+        protected void engineInitVerify(PublicKey publicKey) throws InvalidKeyException {
+            JceMlDsaPublicKey pub = (JceMlDsaPublicKey) this.kf.engineTranslateKey(publicKey);
+            // If pub is a java reference to the original key (no key
+            // translation took place)
+            // then create a native reference to the original PKEY so that the
+            // doInit code can always
+            // free the 'lastPkey' because it is not a key held by the
+            // application.
+            doInit(pub == publicKey ? Pkey.createReference(pub.getPkey()) : pub.getPkey());
+        }
+
+        @Override
+        protected final void signInit(Signature ctx) throws InvalidKeyException {
+            ctx.signMessageInit();
+        }
+
+        @Override
+        protected void verifyInit(Signature ctx) throws InvalidKeyException {
+            ctx.verifyMessageInit();
+        }
+    }
+
+    public static final class MLDSASig44 extends MLDSASig {
+        public MLDSASig44() {
+            super(new MlDsaKeyFactory44());
+        }
+    }
+
+    public static final class MLDSASig65 extends MLDSASig {
+        public MLDSASig65() {
+            super(new MlDsaKeyFactory65());
+        }
+    }
+
+    public static final class MLDSASig87 extends MLDSASig {
+        public MLDSASig87() {
+            super(new MlDsaKeyFactory87());
+        }
+    }
 }

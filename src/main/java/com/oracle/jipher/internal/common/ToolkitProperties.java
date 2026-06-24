@@ -40,7 +40,10 @@
 
 package com.oracle.jipher.internal.common;
 
+import java.security.Security;
+
 import com.oracle.jipher.internal.fips.Fips;
+import com.oracle.jipher.internal.key.JceMlPrivateKey.EncodingScheme;
 
 import static java.lang.Math.max;
 
@@ -55,6 +58,10 @@ public class ToolkitProperties {
     private static final String JAVA_RUNTIME_VERSION_PROPERTY = "java.runtime.version";
 
     private static final String JDK_DEFAULT_KEY_SIZE_PROPERTY = "jdk.security.defaultKeySize";
+    private static final EncodingScheme DEFAULT_ML_PRIVATE_KEY_ENCODING = EncodingScheme.SEED;
+    private static final String JDK_ML_KEM_PRIVATE_KEY_ENCODING = "jdk.mlkem.pkcs8.encoding";
+    private static final String JDK_ML_DSA_PRIVATE_KEY_ENCODING = "jdk.mldsa.pkcs8.encoding";
+
     private static final int JIPHER_PBKDF2_DEFAULT_MINIMUM_PASSWORD_LENGTH = 8;
     private static final int JIPHER_PBKDF2_DEFAULT_MAXIMUM_ITERATION_COUNT = 10_000_000;
 
@@ -134,6 +141,27 @@ public class ToolkitProperties {
 
     public static String getJavaRuntimeVersionValue() {
         return JAVA_RUNTIME_VERSION_VALUE;
+    }
+
+    private static String getOverridableProperty(final String property) {
+        String propVal = System.getProperty(property);
+        if (propVal == null) {
+            propVal = Security.getProperty(property);
+        }
+        return propVal;
+    }
+
+    private static EncodingScheme getEncodingScheme(String property) {
+        String propVal = getOverridableProperty(property);
+        return propVal == null ? DEFAULT_ML_PRIVATE_KEY_ENCODING : EncodingScheme.valueOf(propVal.toUpperCase());
+    }
+
+    public static EncodingScheme getMLKEMEncodingScheme() {
+        return getEncodingScheme(JDK_ML_KEM_PRIVATE_KEY_ENCODING);
+    }
+
+    public static EncodingScheme getMLDSAEncodingScheme() {
+        return getEncodingScheme(JDK_ML_DSA_PRIVATE_KEY_ENCODING);
     }
 
     public static String getJavaKeyLengths() {

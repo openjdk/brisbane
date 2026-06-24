@@ -169,6 +169,13 @@ public class TlsServer {
 
             // From JDK 9 onward internal JDK APIs are no longer accessible by default
             command.add(1, "--add-exports=java.base/sun.security.internal.spec=" + jipherModuleName);
+
+            // SunJSSE uses RawKeySpec to pass the key share into KeyFactory.generatePublic(KeySpec).
+            // This is required for Jipher to be able to access sun.security.util.RawKeySpec.
+            // (Without access, Jipher may fall back to SunJCE if it is registered or otherwise fail the handshake.)
+            command.add(1, "--add-exports=java.base/sun.security.util=" + jipherModuleName);
+
+            // com.oracle.jiphertest.util.X509FactoryUtil.class needs access to sun.security.provider.X509Factory
             command.add(1, "--add-exports=java.base/sun.security.provider=" + jipherTestModuleName);
 
             if (javaRuntimeMajorVersion >= 22) {
@@ -177,12 +184,20 @@ public class TlsServer {
                 command.add(1, "--enable-native-access=" + jipherModuleName);
             }
         }
+        if (System.getProperty("jdk.tls.namedGroups") != null) {
+            command.add(1, "-Djdk.tls.namedGroups=" + System.getProperty("jdk.tls.namedGroups"));
+        }
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
         serverProcess = pb.start();
         serverBR = new BufferedReader(new InputStreamReader(serverProcess.getInputStream()));
-        port = Integer.parseInt(serverBR.readLine().trim());
+        try {
+            port = Integer.parseInt(serverBR.readLine().trim());
+        } catch (NumberFormatException e) {
+            // Ignore - this can happen when the server is run with -agentlib:jdwp
+            port = Integer.parseInt(serverBR.readLine().trim());
+        }
         assertNotEquals(-1, port);
     }
 
@@ -239,7 +254,13 @@ public class TlsServer {
             assertNull(Security.getProvider("JipherJCE"));
         } else {
             // Limit the list of registered security providers to those required to support a TLS stack
-            ProviderSetup.limitProviders(Arrays.asList("JipherJCE", "SUN", "SunJSSE"));
+            List<String> requiredProviderNames = new ArrayList<>(List.of("JipherJCE", "SUN", "SunJSSE"));
+            String namedGroups = System.getProperty("jdk.tls.namedGroups");
+            if (namedGroups != null && namedGroups.toUpperCase().contains("X25519MLKEM768")) {
+                // SunEC is required to provide X25519 component of X25519MLKEM768
+                requiredProviderNames.add("SunEC");
+            }
+            ProviderSetup.limitProviders(requiredProviderNames);
             assertNotNull(Security.getProvider("JipherJCE"));
         }
         SSLContext ctx = TlsSetup.getSSLContext("server");

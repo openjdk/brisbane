@@ -49,39 +49,61 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.spec.KeySpec;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import javax.crypto.spec.DHPrivateKeySpec;
 import javax.crypto.spec.DHPublicKeySpec;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import com.oracle.jiphertest.util.FipsProviderInfoUtil;
 import com.oracle.jiphertest.util.ProviderUtil;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@RunWith(Parameterized.class)
+
 public class KeyPairSerializeTest {
 
-    final private String alg;
+    private static final String MLKEM_ENC_PROP = "jdk.mlkem.pkcs8.encoding";
+    private static final String MLDSA_ENC_PROP = "jdk.mldsa.pkcs8.encoding";
+    private static String MLKEM_ENC_VAL;
+    private static String MLDSA_ENC_VAL;
 
-    @Parameterized.Parameters(name="{0}")
-    public static Collection<String> params() throws Exception {
-        return Arrays.asList("DH", "EC", "RSA");
+    @BeforeAll
+    public static void setup() {
+        MLKEM_ENC_VAL = System.getProperty(MLKEM_ENC_PROP);
+        MLDSA_ENC_VAL = System.getProperty(MLDSA_ENC_PROP);
+        // Set this to allow JDK providers to deserialize.
+        System.setProperty(MLKEM_ENC_PROP, "expandedKey");
+        System.setProperty(MLDSA_ENC_PROP, "expandedKey");
     }
 
-    public KeyPairSerializeTest(String algorithm) {
-        this.alg = algorithm;
+    public static Collection<String> params()  {
+        List<String> params = new ArrayList<>();
+        params.add("DH");
+        params.add("EC");
+        params.add("RSA");
+        if (FipsProviderInfoUtil.isMlKemSupported()) {
+            params.add("ML-KEM");
+        }
+        if (FipsProviderInfoUtil.isMlDsaSupported()) {
+            params.add("ML-DSA");
+        }
+        return params;
     }
 
-    @Test
-    public void serializeDeserializeTest() throws Exception {
-        KeyPairGenerator kpg = ProviderUtil.getKeyPairGenerator(this.alg);
+    @ParameterizedTest
+    @MethodSource("params")
+    public void serializeDeserializeTest(String alg) throws Exception {
+        KeyPairGenerator kpg = ProviderUtil.getKeyPairGenerator(alg);
         KeyPair keyPair = kpg.generateKeyPair();
 
-        if (this.alg.equals("DH") && Security.getProvider("JipherJCE") == null) {
+        if ("DH".equals(alg) && Security.getProvider("JipherJCE") == null) {
             // The SunJCE's DH KeyFactory does not support the dhpublicnumber DH parameter encoding in RFC 3279
             // which accommodates Q. It only supports the dhKeyAgreement DH parameter encoding in PKCS #3 section 9
             // which omits Q.  Hence we have to update the DH key to remove Q.
@@ -100,8 +122,14 @@ public class KeyPairSerializeTest {
     }
 
     void checkKeyPair(KeyPair expected, KeyPair actual) throws Exception {
-        assertEquals(expected.getPrivate(), actual.getPrivate());
-        assertEquals(expected.getPublic(),  actual.getPublic());
+        String alg = expected.getPrivate().getAlgorithm();
+        // PQC Key classes are not part of public API in JDK.
+        if ("ML-KEM".equals(alg) || "ML-DSA".equals(alg)) {
+            assertArrayEquals(expected.getPrivate().getEncoded(), actual.getPrivate().getEncoded());
+        } else {
+            assertEquals(expected.getPrivate(), actual.getPrivate());
+            assertEquals(expected.getPublic(), actual.getPublic());
+        }
     }
 
     // Removes Q from a DH key pair
@@ -110,5 +138,19 @@ public class KeyPairSerializeTest {
         KeySpec pubKeySpec =  kf.getKeySpec(keyPair.getPublic(), DHPublicKeySpec.class);
         KeySpec priKeySpec =  kf.getKeySpec(keyPair.getPrivate(), DHPrivateKeySpec.class);
         return new KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(priKeySpec));
+    }
+
+    @AfterAll
+    public static void tearDown() {
+        if (MLDSA_ENC_VAL == null) {
+            System.clearProperty(MLDSA_ENC_PROP);
+        } else {
+            System.setProperty(MLDSA_ENC_PROP, MLDSA_ENC_VAL);
+        }
+        if (MLKEM_ENC_VAL == null) {
+            System.clearProperty(MLKEM_ENC_PROP);
+        } else {
+            System.setProperty(MLKEM_ENC_PROP, MLKEM_ENC_VAL);
+        }
     }
 }

@@ -80,8 +80,10 @@ import com.oracle.jipher.internal.spi.GcmParameters;
 import com.oracle.jipher.internal.spi.Hkdf;
 import com.oracle.jipher.internal.spi.Hmac;
 import com.oracle.jipher.internal.spi.HmacKeyGenerator;
+import com.oracle.jipher.internal.spi.Kem;
 import com.oracle.jipher.internal.spi.KeyAgree;
 import com.oracle.jipher.internal.spi.KeyPairGen;
+import com.oracle.jipher.internal.spi.MlKeyFactory;
 import com.oracle.jipher.internal.spi.NoDigestSig;
 import com.oracle.jipher.internal.spi.OaepParameters;
 import com.oracle.jipher.internal.spi.PbeCipher;
@@ -118,11 +120,18 @@ import com.oracle.jipher.internal.spi.WrapCipher;
  *     </li>
  *     <li>{@link javax.crypto.KDF}: HKDF-SHA256, HKDF-SHA384, HKDF-SHA512</li>
  *     <li>{@link javax.crypto.KeyAgreement}: DiffieHellman, ECDH</li>
- *     <li>{@link java.security.KeyFactory}: DiffieHellman, DSA, EC, RSA, RSASSA-PSS</li>
+ *     <li>{@link javax.crypto.KEM}: ML-KEM, ML-KEM-512, ML-KEM-768, ML-KEM-1024</li>
+ *     <li>{@link java.security.KeyFactory}:
+ *         DiffieHellman, DSA, EC, RSA, RSASSA-PSS,
+ *         ML-DSA, ML-DSA-44, ML-DSA-65, ML-DSA-87, ML-KEM, ML-KEM-512, ML-KEM-768, ML-KEM-1024
+ *     </li>
  *     <li>{@link javax.crypto.KeyGenerator}:
  *         AES, Hmac&lt;digest&gt;, SunTls12Prf, SunTlsExtendedMasterSecret, SunTlsKeyMaterial, SunTlsRsaPremasterSecret
  *     </li>
- *     <li>{@link java.security.KeyPairGenerator}: DiffieHellman, EC, RSA, RSASSA-PSS </li>
+ *     <li>{@link java.security.KeyPairGenerator}:
+ *         DiffieHellman, EC, RSA, RSASSA-PSS,
+ *         ML-DSA, ML-DSA-44, ML-DSA-65, ML-DSA-87, ML-KEM, ML-KEM-512, ML-KEM-768, ML-KEM-1024
+ *     </li>
  *     <li>{@link javax.crypto.Mac}: Hmac&lt;digest&gt;</li>
  *     <li>{@link java.security.MessageDigest}:
  *         SHA-1, SHA-224, SHA-256, SHA-384, SHA-512, SHA3-224, SHA3-256, SHA3-384, SHA3-512
@@ -134,7 +143,8 @@ import com.oracle.jipher.internal.spi.WrapCipher;
  *     </li>
  *     <li>{@link java.security.Signature}:
  *         NONEwithRSA, &lt;digest&gt;withRSA, &lt;digest&gt;withRSAandMGF1, RSASSA-PSS, NONEwithDSA,
- *         &lt;digest&gt;withDSA, NONEwithECDSA, &lt;digest&gt;withECDSA
+ *         &lt;digest&gt;withDSA, NONEwithECDSA, &lt;digest&gt;withECDSA,
+ *         ML-DSA, ML-DSA-44, ML-DSA-65, ML-DSA-87
  *     </li>
  * </ul>
  * Where:
@@ -194,6 +204,12 @@ public final class JipherJCE extends Provider {
         sb.append(", Diffie-Hellman");
         if (isDSASupported()) {
             sb.append(", DSA");
+        }
+        if (Capabilities.isMlKemSupported()) {
+            sb.append(", ML-KEM");
+        }
+        if (Capabilities.isMlDsaSupported()) {
+            sb.append(", ML-DSA");
         }
         sb.append(", ECDSA, ECDH, HMAC, PBKDF2, RSA, SHA-1, SHA-2, SHA-3)");
 
@@ -508,6 +524,19 @@ public final class JipherJCE extends Provider {
                 KeyAgree.DH.class.getName(), KeyAgree.DH::new, "DiffieHellman",
                 "OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1");
 
+        // KEM implementations
+        if (Capabilities.isMlKemSupported()) {
+            putService("KEM", "ML-KEM",
+                    Kem.class.getName(), Kem::new);
+            putService("KEM", "ML-KEM-512",
+                    Kem.Kem512.class.getName(), Kem.Kem512::new);
+            putService("KEM", "ML-KEM-768",
+                    Kem.Kem768.class.getName(), Kem.Kem768::new);
+            putService("KEM", "ML-KEM-1024",
+                    Kem.Kem1024.class.getName(), Kem.Kem1024::new);
+        }
+
+
         // KeyFactory Implementations
         putService("KeyFactory", "RSA",
                 RsaKeyFactory.class.getName(), RsaKeyFactory::new,
@@ -528,6 +557,28 @@ public final class JipherJCE extends Provider {
         putService("KeyFactory", "DH",
                 DhKeyFactory.class.getName(), DhKeyFactory::new, "DiffieHellman",
                 "OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1");
+
+        if (Capabilities.isMlKemSupported()) {
+            putService("KeyFactory", "ML-KEM",
+                    MlKeyFactory.MlKemKeyFactory.class.getName(), MlKeyFactory.MlKemKeyFactory::new);
+            putService("KeyFactory", "ML-KEM-512",
+                    MlKeyFactory.MlKemKeyFactory512.class.getName(), MlKeyFactory.MlKemKeyFactory512::new);
+            putService("KeyFactory", "ML-KEM-768",
+                    MlKeyFactory.MlKemKeyFactory768.class.getName(), MlKeyFactory.MlKemKeyFactory768::new);
+            putService("KeyFactory", "ML-KEM-1024",
+                    MlKeyFactory.MLKemKeyFactory1024.class.getName(), MlKeyFactory.MLKemKeyFactory1024::new);
+        }
+
+        if (Capabilities.isMlDsaSupported()) {
+            putService("KeyFactory", "ML-DSA",
+                    MlKeyFactory.MlDsaKeyFactory.class.getName(), MlKeyFactory.MlDsaKeyFactory::new);
+            putService("KeyFactory", "ML-DSA-44",
+                    MlKeyFactory.MlDsaKeyFactory44.class.getName(), MlKeyFactory.MlDsaKeyFactory44::new);
+            putService("KeyFactory", "ML-DSA-65",
+                    MlKeyFactory.MlDsaKeyFactory65.class.getName(), MlKeyFactory.MlDsaKeyFactory65::new);
+            putService("KeyFactory", "ML-DSA-87",
+                    MlKeyFactory.MlDsaKeyFactory87.class.getName(), MlKeyFactory.MlDsaKeyFactory87::new);
+        }
 
         // KeyGenerator implementations
         putService("KeyGenerator", "AES",
@@ -619,6 +670,28 @@ public final class JipherJCE extends Provider {
         putService("KeyPairGenerator", "DH",
                 KeyPairGen.Dh.class.getName(), KeyPairGen.Dh::new, "DiffieHellman",
                 "OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1");
+
+        if (Capabilities.isMlKemSupported()) {
+            putService("KeyPairGenerator", "ML-KEM",
+                    KeyPairGen.MlKem.class.getName(), KeyPairGen.MlKem::new);
+            putService("KeyPairGenerator", "ML-KEM-512",
+                    KeyPairGen.MlKem512.class.getName(), KeyPairGen.MlKem512::new);
+            putService("KeyPairGenerator", "ML-KEM-768",
+                    KeyPairGen.MlKem768.class.getName(), KeyPairGen.MlKem768::new);
+            putService("KeyPairGenerator", "ML-KEM-1024",
+                    KeyPairGen.MlKem1024.class.getName(), KeyPairGen.MlKem1024::new);
+        }
+
+        if (Capabilities.isMlDsaSupported()) {
+            putService("KeyPairGenerator", "ML-DSA",
+                    KeyPairGen.MlDsa.class.getName(), KeyPairGen.MlDsa::new);
+            putService("KeyPairGenerator", "ML-DSA-44",
+                    KeyPairGen.MlDsa44.class.getName(), KeyPairGen.MlDsa44::new);
+            putService("KeyPairGenerator", "ML-DSA-65",
+                    KeyPairGen.MlDsa65.class.getName(), KeyPairGen.MlDsa65::new);
+            putService("KeyPairGenerator", "ML-DSA-87",
+                    KeyPairGen.MlDsa87.class.getName(), KeyPairGen.MlDsa87::new);
+        }
 
         // Mac Implementations
         putService("Mac", "HmacSHA1",
@@ -822,6 +895,16 @@ public final class JipherJCE extends Provider {
             putService("Signature", "SHA512withDSA",
                     DsaDigestSig.Sha512WithDsa.class.getName(), DsaDigestSig.Sha512WithDsa::new,
                     "OID.2.16.840.1.101.3.4.3.4", "2.16.840.1.101.3.4.3.4");
+        }
+        if (Capabilities.isMlDsaSupported()) {
+            putService("Signature", "ML-DSA",
+                    NoDigestSig.MLDSASig.class.getName(), NoDigestSig.MLDSASig::new);
+            putService("Signature", "ML-DSA-44",
+                    NoDigestSig.MLDSASig44.class.getName(), NoDigestSig.MLDSASig44::new);
+            putService("Signature", "ML-DSA-65",
+                    NoDigestSig.MLDSASig65.class.getName(), NoDigestSig.MLDSASig65::new);
+            putService("Signature", "ML-DSA-87",
+                    NoDigestSig.MLDSASig87.class.getName(), NoDigestSig.MLDSASig87::new);
         }
     }
 

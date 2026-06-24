@@ -40,6 +40,7 @@
 
 package com.oracle.jipher.internal.spi;
 
+import com.oracle.jipher.internal.common.Debug;
 import com.oracle.jipher.internal.openssl.FipsProviderInfo;
 
 /**
@@ -56,10 +57,36 @@ public class Capabilities {
     private static final boolean DESEDE_IS_SUPPORTED;
     private static final boolean DSA_IS_SUPPORTED;
     private static final boolean SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
+    private static final boolean ML_KEM_IS_SUPPORTED;
+    private static final boolean ML_DSA_IS_SUPPORTED;
+    private static final Debug DEBUG = Debug.getInstance("jipher");
 
     // Initialise capability flags based on the OpenSSL FIPS provider name and version.
     static {
         String name = FipsProviderInfo.getNameString();
+        String patchVersion = FipsProviderInfo.getVersionString();
+
+        DEBUG.println("FIPS Provider detected " + name);
+        DEBUG.println("FIPS Provider version " + patchVersion);
+
+        boolean isPQCSupported = false;
+        if (patchVersion != null) {
+            String[] versionComponents = patchVersion.split("-")[0].split("\\.");
+            if (versionComponents.length >= 2) {
+                try {
+                    int major = Integer.valueOf(versionComponents[0]);
+                    int minor = Integer.valueOf(versionComponents[1]);
+                    DEBUG.println("FIPS Provider major version " + major);
+                    DEBUG.println("FIPS Provider minor version " + minor);
+                    // FIPS certified support for PQC requires minor version >=5.
+                    isPQCSupported = (major == 3 && minor >= 5);
+                } catch (NumberFormatException e) {
+                    // Ignore
+                }
+            }
+        }
+        ML_KEM_IS_SUPPORTED = isPQCSupported;
+        ML_DSA_IS_SUPPORTED = isPQCSupported;
 
         boolean isRHDerivative = (name != null) &&
                 (name.contains("Red Hat Enterprise Linux") || name.contains("Oracle Linux"));
@@ -94,5 +121,11 @@ public class Capabilities {
     }
     public static boolean isSHA1DigestSignatureSupported() {
         return SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
+    }
+    public static boolean isMlKemSupported() {
+        return ML_KEM_IS_SUPPORTED;
+    }
+    public static boolean isMlDsaSupported() {
+        return ML_DSA_IS_SUPPORTED;
     }
 }

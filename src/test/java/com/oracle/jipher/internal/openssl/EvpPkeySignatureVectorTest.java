@@ -71,8 +71,8 @@ public class EvpPkeySignatureVectorTest extends EvpTest {
 
     @Parameterized.Parameters(name = "{index}: {0}")
     public static Collection<Object[]> data() throws Exception {
-        Predicate<Object[]> nonDigestSignature =
-                param -> ((SignatureTestVector) param[1]).getAlg().toUpperCase().startsWith("NONE");
+        Predicate<Object[]> nonDigestSignature = EvpPkeySignatureVectorTest::isAcceptableSignature;
+
         return TestData.forParameterized(SignatureTestVector.class)
                 .stream().filter(nonDigestSignature).collect(Collectors.toList());
     }
@@ -88,6 +88,11 @@ public class EvpPkeySignatureVectorTest extends EvpTest {
     EVP_PKEY_CTX signCtx;
     EVP_PKEY_CTX verifyCtx;
 
+    static boolean isAcceptableSignature(Object[] param) {
+        String alg = ((SignatureTestVector) param[1]).getAlg().toUpperCase();
+        return alg.startsWith("NONE") || alg.equals("ML-DSA");
+    }
+
     static boolean isDeterministic(String alg) {
         return !alg.contains("DSA") && !alg.contains("ECDSA");
     }
@@ -101,7 +106,11 @@ public class EvpPkeySignatureVectorTest extends EvpTest {
         this.data = tv.getData();
         this.signature = tv.getSignature();
 
-        Assume.assumeTrue(FipsProviderInfoUtil.isDSASupported() || !this.alg.contains("withDSA"));
+        if (this.alg.contains("withDSA")) {
+            Assume.assumeTrue(FipsProviderInfoUtil.isDSASupported());
+        } else if (this.alg.equals("ML-DSA")) {
+            Assume.assumeTrue(FipsProviderInfoUtil.isMLDSASupported());
+        }
     }
 
     @Override

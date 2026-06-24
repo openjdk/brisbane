@@ -72,8 +72,11 @@ public class EvpPkeyDigestSignatureVectorTest extends EvpTest {
 
     @Parameterized.Parameters(name = "{index}: {0}")
     public static Collection<Object[]> data() throws Exception {
-        Predicate<Object[]> digestSignature =
-                param -> !((SignatureTestVector) param[1]).getAlg().toUpperCase().startsWith("NONE");
+        Predicate<Object[]> nonDigestSignature =
+                param -> ((SignatureTestVector) param[1]).getAlg().toUpperCase().startsWith("NONE");
+        Predicate<Object[]> mlDsaSignature =
+                        param -> ((SignatureTestVector) param[1]).getAlg().toUpperCase().startsWith("ML-DSA");
+        Predicate<Object[]> digestSignature = nonDigestSignature.or(mlDsaSignature).negate();
         return TestData.forParameterized(SignatureTestVector.class)
                 .stream().filter(digestSignature).collect(Collectors.toList());
     }

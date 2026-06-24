@@ -60,6 +60,7 @@ import org.junit.runners.Parameterized;
 import com.oracle.jiphertest.helpers.ProviderSetup;
 import com.oracle.jiphertest.helpers.TlsServer;
 import com.oracle.jiphertest.helpers.TlsSetup;
+import com.oracle.jiphertest.util.FipsProviderInfoUtil;
 
 import static com.oracle.jiphertest.helpers.TlsSetup.genTestData;
 import static com.oracle.jiphertest.helpers.TlsSetup.readData;
@@ -81,7 +82,13 @@ public class TlsSystemTest {
         cfg = getProviderConfig(System.getProperty("security.config.client"));
         if (cfg == TlsSetup.ProviderConfig.JIPHER_JSSE) {
             // Limit the list of registered security providers to those required to support a TLS stack
-            ProviderSetup.limitProviders(Arrays.asList("JipherJCE", "SUN", "SunJSSE"));
+            List<String> requiredProviderNames = new ArrayList<>(List.of("JipherJCE", "SUN", "SunJSSE"));
+            String namedGroups = System.getProperty("jdk.tls.namedGroups");
+            if (namedGroups != null && namedGroups.toUpperCase().contains("X25519MLKEM768")) {
+                // SunEC is required to provide X25519 component of X25519MLKEM768
+                requiredProviderNames.add("SunEC");
+            }
+            ProviderSetup.limitProviders(requiredProviderNames);
         }
     }
 
@@ -89,9 +96,13 @@ public class TlsSystemTest {
     public static Collection<Object[]> params() throws Exception {
         List<Object[]> all = new ArrayList<>();
 
-        for (String cs : TlsSetup.ciphersuitesV12()) {
-            all.add(new Object[] {getProviderConfigID(), "TLSv1.2",cs});
+        String namedGroups = System.getProperty("jdk.tls.namedGroups");
+        if (namedGroups == null || !namedGroups.toUpperCase().contains("MLKEM")) {
+            for (String cs : TlsSetup.ciphersuitesV12()) {
+                all.add(new Object[]{getProviderConfigID(), "TLSv1.2", cs});
+            }
         }
+
         for (String cs : TlsSetup.ciphersuitesV13()) {
             all.add(new Object[] {getProviderConfigID(), "TLSv1.3",cs});
         }
@@ -121,6 +132,12 @@ public class TlsSystemTest {
 
     @BeforeClass
     public static void setUp() throws Exception {
+        // Only test with MLKEM named groups if the OpenSSL FIPS provider
+        // that Jipher will use during the test supports MLKEM
+        if (System.getProperty("jdk.tls.namedGroups", "").toUpperCase().contains("MLKEM")) {
+            assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
+        }
+
         testData = genTestData(TESTDATA_SIZE);
         server = new TlsServer(getServerConfig(), false);
         serverClientAuth = new TlsServer(getServerConfig(), true);
