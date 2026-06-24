@@ -50,20 +50,48 @@ import static com.oracle.jipher.internal.asn1.Asn1.newBitString;
 import static com.oracle.jipher.internal.asn1.Asn1.newSequence;
 
 
+/**
+ * Base class for Module-Lattice public keys backed by an OpenSSL {@link Pkey} instance.
+ * <p>
+ * This class extends {@link JceOsslPublicKey} to share common OpenSSL key handling and to
+ * support standard JCA {@code KeyFactory} usage.
+ * </p>
+ */
 public abstract sealed class JceMlPublicKey extends JceOsslPublicKey implements JceMlKey
         permits JceMlPublicKey.JceMlKemPublicKey, JceMlPublicKey.JceMlDsaPublicKey {
 
     protected final String mlAlgoName;
 
+    /**
+     * Creates a new Module-Lattice public key.
+     *
+     * @param mlAlgoFamilyName the algorithm family name, one of ML-KEM or ML-DSA
+     * @param mlAlgoName the specific algorithm name, such as ML-KEM-512 or ML-DSA-65
+     * @param pkey the native OpenSSL public key representation
+     */
     JceMlPublicKey(String mlAlgoFamilyName, String mlAlgoName, Pkey pkey) {
         this(mlAlgoFamilyName, mlAlgoName, pkey, null);
     }
 
+    /**
+     * Creates a new Module-Lattice public key.
+     *
+     * @param mlAlgoFamilyName the algorithm family name, one of ML-KEM or ML-DSA
+     * @param mlAlgoName the specific algorithm name, such as ML-KEM-512 or ML-DSA-65
+     * @param pkey the native OpenSSL public key representation
+     * @param encoding the optional encoded key form; may be {@code null}
+     */
     JceMlPublicKey(String mlAlgoFamilyName, String mlAlgoName, Pkey pkey, byte[] encoding) {
         super(mlAlgoFamilyName, pkey, encoding);
         this.mlAlgoName = mlAlgoName;
     }
 
+    /**
+     * Encodes this public key as an X.509 SubjectPublicKeyInfo structure in DER format.
+     *
+     * @return the DER-encoded SubjectPublicKeyInfo bytes
+     * @throws InvalidKeyException if the key cannot be encoded
+     */
     @Override
     byte[] derEncode() throws InvalidKeyException {
         byte[] encodedKey = pkey.getMLPubKeyData();
@@ -72,22 +100,49 @@ public abstract sealed class JceMlPublicKey extends JceOsslPublicKey implements 
                 newBitString(encodedKey)).encodeDerOctets();
     }
 
+    /**
+     * Returns the variant (ML-KEM or ML-DSA) of this ML key
+     *
+     * @return the ML key variant
+     */
     @Override
     public String variant() {
         return this.mlAlgoName;
     }
 
+    /**
+     * Returns the parameters associated with this key.
+     *
+     * @return the associated parameters
+     */
     @Override
     public AlgorithmParameterSpec getParams() {
         return new NamedParameterSpec(variant());
     }
 
+    /**
+     * ML-KEM public key backed by an OpenSSL {@link Pkey} instance.
+     */
     public static final class JceMlKemPublicKey extends JceMlPublicKey {
 
+        /**
+         * Creates a new ML-KEM public key.
+         *
+         * @param mlKemAlgo the ML-KEM algorithm name, such as ML-KEM-512, ML-KEM-768, or ML-KEM-1024
+         * @param pkey the native OpenSSL public key representation
+         */
         public JceMlKemPublicKey(String mlKemAlgo, Pkey pkey) {
             super(ML_KEM_ALGO_FAMILY_NAME, mlKemAlgo, pkey);
         }
 
+
+        /**
+         * Creates a new ML-KEM public key.
+         *
+         * @param mlKemAlgo the ML-KEM algorithm name, such as ML-KEM-512, ML-KEM-768, or ML-KEM-1024
+         * @param pkey the native OpenSSL public key representation
+         * @param encoding the optional encoded key form; may be {@code null}
+         */
         public JceMlKemPublicKey(String mlKemAlgo, Pkey pkey, byte[] encoding) {
             super(ML_KEM_ALGO_FAMILY_NAME, mlKemAlgo, pkey, encoding);
         }
@@ -98,12 +153,28 @@ public abstract sealed class JceMlPublicKey extends JceOsslPublicKey implements 
         }
     }
 
+    /**
+     * ML-DSA public key backed by an OpenSSL {@link Pkey} instance.
+     */
     public static final class JceMlDsaPublicKey extends JceMlPublicKey {
 
+        /**
+         * Creates a new ML-DSA public key.
+         *
+         * @param mlDsaAlgo the ML-DSA algorithm name, such as ML-DSA-44, ML-DSA-65, or ML-DSA-87
+         * @param pkey the native OpenSSL public key representation
+         */
         public JceMlDsaPublicKey(String mlDsaAlgo, Pkey pkey) {
             super(ML_DSA_ALGO_FAMILY_NAME, mlDsaAlgo, pkey);
         }
 
+        /**
+         * Creates a new ML-DSA public key.
+         *
+         * @param mlDsaAlgo the ML-DSA algorithm name, such as ML-DSA-44, ML-DSA-65, or ML-DSA-87
+         * @param pkey the native OpenSSL public key representation
+         * @param encoding the optional encoded key form; may be {@code null}
+         */
         public JceMlDsaPublicKey(String mlDsaAlgo, Pkey pkey, byte[] encoding) {
             super(ML_DSA_ALGO_FAMILY_NAME, mlDsaAlgo, pkey, encoding);
         }

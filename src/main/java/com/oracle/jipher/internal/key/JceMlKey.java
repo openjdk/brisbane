@@ -47,6 +47,17 @@ import com.oracle.jipher.internal.asn1.Asn1BerValue;
 import static com.oracle.jipher.internal.asn1.Asn1.newOid;
 
 
+/**
+ * Interface for Module-Lattice keys.
+ * <p>
+ * Defines supported Module-Lattice Key variants {ML-KEM, ML-DSA}, algorithm names and
+ * object identifiers.
+ * </p>
+ * <p>
+ * Provides a method for looking up the details of an ML algorithm
+ * by name or OID.
+ * </p>
+ */
 public sealed interface JceMlKey permits JceMlPrivateKey, JceMlPublicKey {
 
     enum Algorithm {

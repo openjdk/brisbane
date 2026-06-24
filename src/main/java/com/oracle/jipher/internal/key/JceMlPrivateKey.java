@@ -56,6 +56,17 @@ import static com.oracle.jipher.internal.asn1.Asn1.newInteger;
 import static com.oracle.jipher.internal.asn1.Asn1.newOctetString;
 import static com.oracle.jipher.internal.asn1.Asn1.newSequence;
 
+/**
+ * Base class for Module-Lattice private keys backed by an OpenSSL {@link Pkey} instance.
+ * <p>
+ * This class extends {@link JceOsslPrivateKey} to share common OpenSSL key handling and to
+ * support standard JCA {@code KeyFactory} usage.
+ * </p>
+ * The key can be explicitly destroyed, which frees the native resources and
+ * prevents any further use of the key material. Once destroyed, attempts to
+ * access the key (e.g. via {@link #getPkey()} or {@link #getEncoded()}) will
+ * result in an {@link IllegalStateException}.
+ */
 public abstract sealed class JceMlPrivateKey extends JceOsslPrivateKey implements JceMlKey
         permits JceMlPrivateKey.JceMlKemPrivateKey, JceMlPrivateKey.JceMlDsaPrivateKey {
 
@@ -67,6 +78,14 @@ public abstract sealed class JceMlPrivateKey extends JceOsslPrivateKey implement
     final String mlAlgoName;
     private volatile int hashCode = 0;
 
+    /**
+     * Creates a new Module-Lattice private key.
+     *
+     * @param pkey the native OpenSSL public key representation
+     * @param mlAlgoFamilyName the algorithm family name, one of ML-KEM or ML-DSA
+     * @param mlAlgoName the specific algorithm name, such as ML-KEM-512 or ML-DSA-65
+     * @param scheme the encoding scheme, on of SEED, EXPANDEDKEY or BOTH
+     */
     JceMlPrivateKey(Pkey pkey, String mlAlgoFamilyName, String mlAlgoName, EncodingScheme scheme) {
         super(mlAlgoFamilyName, pkey);
         this.encodingScheme = scheme;
@@ -122,11 +141,21 @@ public abstract sealed class JceMlPrivateKey extends JceOsslPrivateKey implement
         }
     }
 
+    /**
+     * Returns the variant (ML-KEM or ML-DSA) of this ML key
+     *
+     * @return the ML key variant
+     */
     @Override
     public String variant() {
         return this.mlAlgoName;
     }
 
+    /**
+     * Returns the parameters associated with this key.
+     *
+     * @return the associated parameters
+     */
     @Override
     public AlgorithmParameterSpec getParams() {
         return new NamedParameterSpec(variant());
@@ -173,8 +202,17 @@ public abstract sealed class JceMlPrivateKey extends JceOsslPrivateKey implement
         }
     }
 
+    /**
+     * ML-KEM private key backed by an OpenSSL {@link Pkey} instance.
+     */
     public static final class JceMlKemPrivateKey extends JceMlPrivateKey {
 
+        /**
+         * Creates a new ML-KEM private key.
+         *
+         * @param mlKemAlgoName the ML-KEM algorithm name, such as ML-KEM-512, ML-KEM-768, or ML-KEM-1024
+         * @param pkey the native OpenSSL private key representation
+         */
         public JceMlKemPrivateKey(String mlKemAlgoName, Pkey pkey) {
             super(pkey, ML_KEM_ALGO_FAMILY_NAME, mlKemAlgoName, ToolkitProperties.getMLKEMEncodingScheme());
         }
@@ -185,8 +223,17 @@ public abstract sealed class JceMlPrivateKey extends JceOsslPrivateKey implement
         }
     }
 
+    /**
+     * ML-DSA private key backed by an OpenSSL {@link Pkey} instance.
+     */
     public static final class JceMlDsaPrivateKey extends JceMlPrivateKey {
 
+        /**
+         * Creates a new ML-DSA private key.
+         *
+         * @param mlDsaAlgoName the ML-DSA algorithm name, such as ML-DSA-44, ML-DSA-65, or ML-DSA-87
+         * @param pkey the native OpenSSL private key representation
+         */
         public JceMlDsaPrivateKey(String mlDsaAlgoName, Pkey pkey) {
             super(pkey, ML_DSA_ALGO_FAMILY_NAME, mlDsaAlgoName, ToolkitProperties.getMLDSAEncodingScheme());
         }
