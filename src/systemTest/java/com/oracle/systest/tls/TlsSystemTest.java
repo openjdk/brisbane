@@ -83,7 +83,8 @@ public class TlsSystemTest {
         if (cfg == TlsSetup.ProviderConfig.JIPHER_JSSE) {
             // Limit the list of registered security providers to those required to support a TLS stack
             List<String> requiredProviderNames = new ArrayList<>(List.of("JipherJCE", "SUN", "SunJSSE"));
-            if ("X25519MLKEM768".equals(System.getProperty("jdk.tls.namedGroups"))) {
+            String namedGroups = System.getProperty("jdk.tls.namedGroups");
+            if (namedGroups != null && namedGroups.toUpperCase().contains("X25519MLKEM768")) {
                 // SunEC is required to provide X25519 component of X25519MLKEM768
                 requiredProviderNames.add("SunEC");
             }
