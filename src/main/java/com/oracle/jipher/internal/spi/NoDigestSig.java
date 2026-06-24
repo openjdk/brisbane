@@ -73,7 +73,7 @@ import static com.oracle.jipher.internal.fips.CryptoOp.VERIFY;
 /**
  * Implementation of {@link SignatureSpi} for {@code NONEWith}
  * <a href=https://docs.oracle.com/en/java/javase/25/docs/specs/security/standard-names.html#signature-algorithms>Signature algorithms</a>
- * (e.g {@code NONEwithSDSA}. {@code NONEwithRSA}, {@code NONEwithECDSA}),
+ * (e.g {@code NONEwithDSA}. {@code NONEwithRSA}, {@code NONEwithECDSA}),
  * where no digesting is done, and for {@code ML-DSA}, where all message data must be
  * buffered and then processed as a one-shot operation.
  */
