@@ -42,11 +42,13 @@ package com.oracle.systest.tls;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -98,6 +100,12 @@ public class TlsSystemTest {
 
         String namedGroups = System.getProperty("jdk.tls.namedGroups");
         if (namedGroups == null || !namedGroups.toUpperCase().contains("MLKEM")) {
+            // TLS 1.2 ECDHE does not require the ephemeral ECDHE group to match the
+            // ECDSA certificate curve. However, JSSE checks the EC certificate curve
+            // against the configured named groups for TLS 1.2 and earlier.
+            // The TLS test PKI includes server certificates for SecP256r1,
+            // SecP384r1 and SecP521r1 to allow testing these named groups for TLS 1.2.
+
             for (String cs : TlsSetup.ciphersuitesV12()) {
                 all.add(new Object[]{getProviderConfigID(), "TLSv1.2", cs});
             }
@@ -132,9 +140,30 @@ public class TlsSystemTest {
 
     @BeforeClass
     public static void setUp() throws Exception {
+        String namedGroups = System.getProperty("jdk.tls.namedGroups");
+        if (namedGroups != null) {
+            try {
+                // Throws NoSuchMethodException if this JDK cannot query named groups.
+                Method getNamedGroups = SSLParameters.class.getMethod("getNamedGroups");
+                // Throws IllegalArgumentException or ExceptionInInitializerError if jdk.tls.namedGroups
+                // does not contain a group supported by this JSSE.
+                SSLParameters supportedSSLParameters = SSLContext.getDefault().getSupportedSSLParameters();
+                // Throws ReflectiveOperationException if the reflective method invocation fails.
+                String[] supportedNamedGroups = (String[]) getNamedGroups.invoke(supportedSSLParameters);
+                for (String namedGroup : namedGroups.split(",")) {
+                    assumeTrue("Named group is not supported by this JSSE: " + namedGroup,
+                            isNamedGroupSupported(namedGroup, supportedNamedGroups));
+                }
+            } catch (NoSuchMethodException e) {
+                assumeTrue("Named groups cannot be queried by this JSSE: " + namedGroups, false);
+            } catch (ExceptionInInitializerError | IllegalArgumentException | ReflectiveOperationException e) {
+                assumeTrue("Named groups are not supported by this JSSE: " + namedGroups, false);
+            }
+        }
+
         // Only test with MLKEM named groups if the OpenSSL FIPS provider
         // that Jipher will use during the test supports MLKEM
-        if (System.getProperty("jdk.tls.namedGroups", "").toUpperCase().contains("MLKEM")) {
+        if (namedGroups != null && namedGroups.toUpperCase().contains("MLKEM")) {
             assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
         }
 
@@ -146,6 +175,15 @@ public class TlsSystemTest {
 
         SSLContext ctx = TlsSetup.getSSLContext("client");
         sf = ctx.getSocketFactory();
+    }
+
+    private static boolean isNamedGroupSupported(String namedGroup, String[] supportedNamedGroups) {
+        for (String supportedNamedGroup : supportedNamedGroups) {
+            if (namedGroup.trim().equalsIgnoreCase(supportedNamedGroup)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public TlsSystemTest(String configId, String protocolVer, String cipherSuite) {

@@ -43,14 +43,20 @@ package com.oracle.jiphertest.helpers;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Socket;
 import java.security.KeyStore;
+import java.security.Principal;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509ExtendedKeyManager;
 
 import com.oracle.jiphertest.testdata.TestData;
 import com.oracle.jiphertest.util.EnvUtil;
@@ -80,8 +86,86 @@ public class TlsSetup {
         ts.load(TestData.getResourceAsStream(directory + endpointType + "trust" + KS_EXT), PASSPHRASE);
         kmf.init(ks, PASSPHRASE);
         tmf.init(ts);
-        ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+        ctx.init(getKeyManagers(endpointType, kmf), tmf.getTrustManagers(), null);
         return ctx;
+    }
+
+    private static KeyManager[] getKeyManagers(String endpointType, KeyManagerFactory kmf) {
+        // Clients and most server configurations use the default key managers. When a
+        // server test restricts jdk.tls.namedGroups to one EC group, force JSSE to use
+        // the matching EC server certificate alias from server.p12.
+        // (For TLS 1.2 and earlier, JSSE checks the EC certificate curve against
+        // jdk.tls.namedGroups. If the default key manager chooses an EC certificate
+        // with a different curve, SunJSSE reports "no cipher suites in common".)
+        KeyManager[] keyManagers = kmf.getKeyManagers();
+        String namedGroups = System.getProperty("jdk.tls.namedGroups");
+        String ecAlias = null;
+        if (namedGroups != null) {
+            ecAlias = switch (namedGroups.toLowerCase()) {
+                case "secp256r1" -> "ec_p256_server";
+                case "secp384r1" -> "ec_p384_server";
+                case "secp521r1" -> "ec_p521_server";
+                default -> null;
+            };
+        }
+
+        // Override server EC alias selection to force the required certificate.
+        if ("server".equals(endpointType) && ecAlias != null) {
+            for (int i = 0; i < keyManagers.length; i++) {
+                if (keyManagers[i] instanceof X509ExtendedKeyManager keyManager) {
+                    keyManagers[i] = new ServerEcAliasKeyManager(keyManager, ecAlias);
+                }
+            }
+        }
+
+        return keyManagers;
+    }
+
+    private static final class ServerEcAliasKeyManager extends X509ExtendedKeyManager {
+        private final X509ExtendedKeyManager akm;
+        private final String ecAlias;
+
+        private ServerEcAliasKeyManager(X509ExtendedKeyManager akm, String ecAlias) {
+            this.akm = akm;
+            this.ecAlias = ecAlias;
+        }
+
+        @Override
+        public String[] getClientAliases(String keyType, Principal[] issuers) {
+            return akm.getClientAliases(keyType, issuers);
+        }
+
+        @Override
+        public String chooseClientAlias(String[] keyType, Principal[] issuers, Socket socket) {
+            return akm.chooseClientAlias(keyType, issuers, socket);
+        }
+
+        @Override
+        public String chooseServerAlias(String keyType, Principal[] issuers, Socket socket) {
+            if (isEcKeyType(keyType)) {
+                return ecAlias;
+            }
+            return akm.chooseServerAlias(keyType, issuers, socket);
+        }
+
+        @Override
+        public String[] getServerAliases(String keyType, Principal[] issuers) {
+            return akm.getServerAliases(keyType, issuers);
+        }
+
+        @Override
+        public X509Certificate[] getCertificateChain(String alias) {
+            return akm.getCertificateChain(alias);
+        }
+
+        @Override
+        public PrivateKey getPrivateKey(String alias) {
+            return akm.getPrivateKey(alias);
+        }
+
+        private static boolean isEcKeyType(String keyType) {
+            return keyType != null && keyType.equals("EC");
+        }
     }
 
     public static byte[] readData(InputStream is, int n) throws IOException {

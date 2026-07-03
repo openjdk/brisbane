@@ -49,7 +49,11 @@
 #         |
 #         +-> serverca -+-> rsa_server
 #                       |
-#                       +-> ec_server
+#                       +-> ec_p256_server
+#                       |
+#                       +-> ec_p384_server
+#                       |
+#                       +-> ec_p521_server
 #                       |
 #                       +-> dsa_server
 #
@@ -62,9 +66,10 @@
 # The client.<ext> keystore contains the client end-entity certificate and
 # private key along with the clientca and root certificates.
 #
-# The server.<ext> keystore contains the three server end-entity certificates
-# (rsa_server, ec_server and dsa_server) and their corresponding private keys
-# along with the serverca and root certificates.
+# The server.<ext> keystore contains the server end-entity certificates
+# (rsa_server, ec_p256_server, ec_p384_server, ec_p521_server and dsa_server)
+# and their corresponding private keys along with the serverca and root
+# certificates.
 #
 # The clienttrust.<ext> keystore contains the serverca certificate while the
 # servertrust.<ext> keystore contains the clientca certificate.
@@ -87,7 +92,8 @@ if ! command -v  "$KEYTOOL_CMD" >/dev/null 2>&1 ; then
 fi
 
 # Check that the Java version supports RFC 9879. At the time of writing this was JDK 26+
-KEYTOOL_JAVA_MAJOR_VERSION=$($KEYTOOL_CMD -J-version 2>&1 | awk -F[\".] '/version/ {print $2}')
+# (Sanitize version number to allow for early access releases)
+KEYTOOL_JAVA_MAJOR_VERSION=$($KEYTOOL_CMD -J-version 2>&1 | awk -F[\".] '/version/ {print $2}' | sed 's/[^0-9].*//')
 echo "Current keytool java runtime major version: $KEYTOOL_JAVA_MAJOR_VERSION."
 if [ $KEYTOOL_JAVA_MAJOR_VERSION -lt '26' ]; then
     echo "The keytool java runtime version must support RFC 9879."
@@ -123,7 +129,7 @@ ext=p12
 st=pkcs12
 
 rm -f root.pem serverca.pem clientca.pem client.pem
-rm -f rsa_server.pem ec_server.pem dsa_server.pem
+rm -f rsa_server.pem ec_p256_server.pem ec_p384_server.pem ec_p521_server.pem dsa_server.pem
 rm -f root.$ext serverca.$ext server.$ext clientca.$ext client.$ext
 rm -f clienttrust.$ext servertrust.$ext genpki_log.txt
 
@@ -166,9 +172,9 @@ get_sigalg()
 #
 # Generate a key-pair.
 #
-# Usage: genkeypair <1:alias> <2:keyalg> <3:certext> <4:dname> <5:keystore>
+# Usage: gen_keypair <1:alias> <2:keyalg> <3:certext> <4:dname> <5:keystore>
 #
-genkeypair()
+gen_keypair()
 {
     echo "Generating $2 key-pair for $1"
     get_keyparam $2
@@ -179,11 +185,25 @@ genkeypair()
 }
 
 #
+# Generate an EC key-pair for a specific named curve.
+#
+# Usage: gen_ec_keypair <1:alias> <2:groupname> <3:certext> <4:dname> <5:keystore>
+#
+gen_ec_keypair()
+{
+    echo "Generating EC key-pair for $1 using $2"
+    get_sigalg EC
+    $KEYTOOL_CMD -keypass $pass -storepass $pass -genkeypair -keyalg EC         \
+        -groupname $2 -sigalg $sigalg -storetype $st -keystore "$5" -alias $1 $3 \
+        -validity $validity -dname "$4" 2>> genpki_log.txt
+}
+
+#
 # Import a certificate into the specified keystore.
 #
-# Usage: importcert <1:alias> <2:pem> <3:keystore>
+# Usage: import_cert <1:alias> <2:pem> <3:keystore>
 #
-importcert()
+import_cert()
 {
     echo "Importing $2 into $3 as $1"
     $KEYTOOL_CMD -storepass $pass -storetype $st -keystore "$3" -importcert       \
@@ -194,10 +214,10 @@ importcert()
 # Generate a certificate for the specified key-pair and replace the self-signed
 # placeholder certificate with the generated certificate.
 #
-# Usage: gencert <1:alias> <2:keyalg> <3:signer_alias> <4:signer_keyalg>
+# Usage: gen_cert <1:alias> <2:keyalg> <3:signer_alias> <4:signer_keyalg>
 #                <5:certext> <6:certs> <7:keystore>
 #
-gencert()
+gen_cert()
 {
     get_sigalg $4
     signer_sigalg=$sigalg
@@ -222,19 +242,33 @@ gencert()
 # Generate a key-pair and issue a new certificate signed by the specified
 # signer.
 #
-# Usage: issuecert <1:alias> <2:keyalg> <3:signer_alias> <4:signer_keyalg>
+# Usage: issue_cert <1:alias> <2:keyalg> <3:signer_alias> <4:signer_keyalg>
 #                  <5:genkey_certext> <6:dname> <7:gencert_certext> <8:certs>
 #                  <9:keystore>
 #
-issuecert()
+issue_cert()
 {
-    genkeypair $1 $2 "$5" "$6" $9
-    gencert $1 $2 $3 $4 "$7" "$8" $9
+    gen_keypair $1 $2 "$5" "$6" $9
+    gen_cert $1 $2 $3 $4 "$7" "$8" $9
+}
+
+#
+# Generate an EC key-pair for a specific named curve and issue a new certificate
+# signed by the specified signer.
+#
+# Usage: issue_ec_cert <1:alias> <2:groupname> <3:signer_alias> <4:signer_keyalg>
+#                     <5:genkey_certext> <6:dname> <7:gencert_certext> <8:certs>
+#                     <9:keystore>
+#
+issue_ec_cert()
+{
+    gen_ec_keypair $1 $2 "$5" "$6" $9
+    gen_cert $1 EC $3 $4 "$7" "$8" $9
 }
 
 # Generate key-pair for root certificate
 echo "Generating root key-pair"
-genkeypair root $root_keyalg "-ext bc:c" "OU=Root Certificate Authority, O=BigCA, L=Cupertino, ST=CA, C=US" root.$ext
+gen_keypair root $root_keyalg "-ext bc:c" "OU=Root Certificate Authority, O=BigCA, L=Cupertino, ST=CA, C=US" root.$ext
 
 # Export the self-signed root certificate
 echo "Exporting root cert"
@@ -244,44 +278,50 @@ $KEYTOOL_CMD -storepass $pass -storetype $st -keystore root.$ext -alias root    
 echo "*** Issuing certificates"
 
 # Issue intermediate CA certificate (server-CA)
-issuecert serverca $ca_keyalg root $root_keyalg "-ext bc:c"                       \
+issue_cert serverca $ca_keyalg root $root_keyalg "-ext bc:c"                       \
     "OU=Certificate Authority 1, O=BigCA, L=Cupertino, ST=CA, C=US"               \
     "-ext BC=0" root.pem serverca.$ext
 
 # Issue RSA end entity certificate (server-EE)
 eeku=digitalSignature,keyEncipherment
-issuecert rsa_server RSA serverca $ca_keyalg ""                                   \
+issue_cert rsa_server RSA serverca $ca_keyalg ""                                   \
     "CN=$serverip, OU=Widget Development Group, O=Ficticious Widgets\\, Inc., L=San Mateo, ST=CA, C=US" \
     "-ext KU:c=$eeku -ext SAN=IP:$serverip" "root.pem serverca.pem" server.$ext
 
 # Issue EC end entity certificate (server-EE)
 eeku=digitalSignature,keyAgreement
-issuecert ec_server EC serverca $ca_keyalg ""                                     \
+issue_ec_cert ec_p256_server secp256r1 serverca $ca_keyalg ""                     \
+    "CN=$serverip, OU=Widget Development Group, O=Ficticious Widgets\\, Inc., L=San Mateo, ST=CA, C=US" \
+    "-ext KU:c=$eeku -ext SAN=IP:$serverip" "root.pem serverca.pem" server.$ext
+issue_ec_cert ec_p384_server secp384r1 serverca $ca_keyalg ""                     \
+    "CN=$serverip, OU=Widget Development Group, O=Ficticious Widgets\\, Inc., L=San Mateo, ST=CA, C=US" \
+    "-ext KU:c=$eeku -ext SAN=IP:$serverip" "root.pem serverca.pem" server.$ext
+issue_ec_cert ec_p521_server secp521r1 serverca $ca_keyalg ""                     \
     "CN=$serverip, OU=Widget Development Group, O=Ficticious Widgets\\, Inc., L=San Mateo, ST=CA, C=US" \
     "-ext KU:c=$eeku -ext SAN=IP:$serverip" "root.pem serverca.pem" server.$ext
 
 # Issue DSA end entity certificate (server-EE)
 eeku=digitalSignature
-issuecert dsa_server DSA serverca $ca_keyalg ""                                   \
+issue_cert dsa_server DSA serverca $ca_keyalg ""                                   \
     "CN=$serverip, OU=Widget Development Group, O=Ficticious Widgets\\, Inc., L=San Mateo, ST=CA, C=US" \
     "-ext KU:c=$eeku -ext SAN=IP:$serverip" "root.pem serverca.pem" server.$ext
 
 # Issue intermediate CA certificate (client-CA)
-issuecert clientca $ca_keyalg root $root_keyalg "-ext bc:c"                       \
+issue_cert clientca $ca_keyalg root $root_keyalg "-ext bc:c"                       \
     "OU=Certificate Authority 2, O=BigCA, L=Cupertino, ST=CA, C=US"               \
     "-ext BC=0" root.pem clientca.$ext
 
 # Issue end entity certificate for client authentication (client-EE)
-issuecert client $client_ee_keyalg clientca $ca_keyalg ""                         \
+issue_cert client $client_ee_keyalg clientca $ca_keyalg ""                         \
     "CN=Duke, OU=Java Software, O=Oracle, L=Cupertino, ST=CA, C=US"               \
     "-ext KU:c=$client_eeku" "root.pem clientca.pem" client.$ext
 
 echo "*** Creating trust stores"
 
 # Create a trust store for the server that contains the client CA certificate
-importcert clientca clientca.pem servertrust.$ext
+import_cert clientca clientca.pem servertrust.$ext
 # Create a trust store for the client that contains the server CA certificate
-importcert serverca serverca.pem clienttrust.$ext
+import_cert serverca serverca.pem clienttrust.$ext
 
 # Workaround for the absence of PKCS#12 KeyStore support for RFC 9879 in JDK versions less than 26 - See JDK-8343232
 # This can be removed when support for RFC 9879 is backported to JDK 25

@@ -76,7 +76,11 @@ The generated PKI certificate hierarchy is as follows:
         |
         +-> serverca -+-> rsa_server
                       |
-                      +-> ec_server
+                      +-> ec_p256_server
+                      |
+                      +-> ec_p384_server
+                      |
+                      +-> ec_p521_server
                       |
                       +-> dsa_server
 ```
@@ -87,9 +91,10 @@ The **serverca** certificate is trusted by the client.
 The `client.p12` keystore contains the client end-entity certificate and
 private key along with the **clientca** and **root** certificates.
 
-The `server.p12` keystore contains the three server end-entity certificates
-(**rsa_server**, **ec_server** and **dsa_server**) and their corresponding
-private keys along with the **serverca** and **root** certificates.
+The `server.p12` keystore contains the server end-entity certificates
+(**rsa_server**, **ec_p256_server**, **ec_p384_server**, **ec_p521_server** and
+**dsa_server**) and their corresponding private keys along with the **serverca**
+and **root** certificates.
 
 The `clienttrust.p12` keystore contains the **serverca** certificate while the
 `servertrust.p12` keystore contains the **clientca** certificate.
