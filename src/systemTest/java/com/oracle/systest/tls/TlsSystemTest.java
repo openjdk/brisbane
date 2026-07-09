@@ -42,7 +42,6 @@ package com.oracle.systest.tls;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -143,20 +142,13 @@ public class TlsSystemTest {
         String namedGroups = System.getProperty("jdk.tls.namedGroups");
         if (namedGroups != null) {
             try {
-                // Throws NoSuchMethodException if this JDK cannot query named groups.
-                Method getNamedGroups = SSLParameters.class.getMethod("getNamedGroups");
                 // Throws IllegalArgumentException or ExceptionInInitializerError if jdk.tls.namedGroups
                 // does not contain a group supported by this JSSE.
                 SSLParameters supportedSSLParameters = SSLContext.getDefault().getSupportedSSLParameters();
-                // Throws ReflectiveOperationException if the reflective method invocation fails.
-                String[] supportedNamedGroups = (String[]) getNamedGroups.invoke(supportedSSLParameters);
-                for (String namedGroup : namedGroups.split(",")) {
-                    assumeTrue("Named group is not supported by this JSSE: " + namedGroup,
-                            isNamedGroupSupported(namedGroup, supportedNamedGroups));
-                }
-            } catch (NoSuchMethodException e) {
-                assumeTrue("Named groups cannot be queried by this JSSE: " + namedGroups, false);
-            } catch (ExceptionInInitializerError | IllegalArgumentException | ReflectiveOperationException e) {
+                String[] supportedNamedGroups = supportedSSLParameters.getNamedGroups();
+                assumeTrue("Named groups are not supported by this JSSE: " + namedGroups,
+                        isAnyNamedGroupSupported(namedGroups, supportedNamedGroups));
+            } catch (ExceptionInInitializerError | IllegalArgumentException e) {
                 assumeTrue("Named groups are not supported by this JSSE: " + namedGroups, false);
             }
         }
@@ -177,10 +169,12 @@ public class TlsSystemTest {
         sf = ctx.getSocketFactory();
     }
 
-    private static boolean isNamedGroupSupported(String namedGroup, String[] supportedNamedGroups) {
-        for (String supportedNamedGroup : supportedNamedGroups) {
-            if (namedGroup.trim().equalsIgnoreCase(supportedNamedGroup)) {
-                return true;
+    private static boolean isAnyNamedGroupSupported(String namedGroups, String[] supportedNamedGroups) {
+        for (String namedGroup : namedGroups.split(",")) {
+            for (String supportedNamedGroup : supportedNamedGroups) {
+                if (namedGroup.trim().equalsIgnoreCase(supportedNamedGroup)) {
+                    return true;
+                }
             }
         }
         return false;
