@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -139,23 +138,10 @@ public class TlsSystemTest {
 
     @BeforeClass
     public static void setUp() throws Exception {
-        String namedGroups = System.getProperty("jdk.tls.namedGroups");
-        if (namedGroups != null) {
-            try {
-                // Throws IllegalArgumentException or ExceptionInInitializerError if jdk.tls.namedGroups
-                // does not contain a group supported by this JSSE.
-                SSLParameters supportedSSLParameters = SSLContext.getDefault().getSupportedSSLParameters();
-                String[] supportedNamedGroups = supportedSSLParameters.getNamedGroups();
-                assumeTrue("Named groups are not supported by this JSSE: " + namedGroups,
-                        isAnyNamedGroupSupported(namedGroups, supportedNamedGroups));
-            } catch (ExceptionInInitializerError | IllegalArgumentException e) {
-                assumeTrue("Named groups are not supported by this JSSE: " + namedGroups, false);
-            }
-        }
 
         // Only test with MLKEM named groups if the OpenSSL FIPS provider
         // that Jipher will use during the test supports MLKEM
-        if (namedGroups != null && namedGroups.toUpperCase().contains("MLKEM")) {
+        if (System.getProperty("jdk.tls.namedGroups", "").toUpperCase().contains("MLKEM")) {
             assumeTrue(FipsProviderInfoUtil.isMlKemSupported());
         }
 
@@ -167,17 +153,6 @@ public class TlsSystemTest {
 
         SSLContext ctx = TlsSetup.getSSLContext("client");
         sf = ctx.getSocketFactory();
-    }
-
-    private static boolean isAnyNamedGroupSupported(String namedGroups, String[] supportedNamedGroups) {
-        for (String namedGroup : namedGroups.split(",")) {
-            for (String supportedNamedGroup : supportedNamedGroups) {
-                if (namedGroup.trim().equalsIgnoreCase(supportedNamedGroup)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     public TlsSystemTest(String configId, String protocolVer, String cipherSuite) {
