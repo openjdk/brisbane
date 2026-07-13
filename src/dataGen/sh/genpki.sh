@@ -93,7 +93,7 @@ fi
 
 # Check that the Java version supports RFC 9879. At the time of writing this was JDK 26+
 # (Sanitize version number to allow for early access releases)
-KEYTOOL_JAVA_MAJOR_VERSION=$($KEYTOOL_CMD -J-version 2>&1 | awk -F[\".] '/version/ {print $2}' | sed 's/[^0-9].*//')
+KEYTOOL_JAVA_MAJOR_VERSION=$($KEYTOOL_CMD -J-version 2>&1 | awk -F'[".]' '/version/ {print $2}' | sed 's/[^0-9].*//')
 echo "Current keytool java runtime major version: $KEYTOOL_JAVA_MAJOR_VERSION."
 if [ $KEYTOOL_JAVA_MAJOR_VERSION -lt '26' ]; then
     echo "The keytool java runtime version must support RFC 9879."
