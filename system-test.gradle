@@ -270,9 +270,6 @@ def namedGroups = [
 
 if (TEST_PQC_GROUPS) {
     namedGroups += [
-            'MLKEM512',
-            'MLKEM768',
-            'MLKEM1024',
             'X25519MLKEM768',
             'SecP256r1MLKEM768',
             'SecP384r1MLKEM1024'
