@@ -75,7 +75,7 @@
 # servertrust.<ext> keystore contains the clientca certificate.
 #
 
-# Deterine how to run keytool (and java & javac)
+# Determine how to run keytool (and java & javac)
 if [ -n "$JAVA_HOME" ] ; then
     KEYTOOL_CMD="$JAVA_HOME/bin/keytool"
     JAVA_CMD="$JAVA_HOME/bin/java"
@@ -95,7 +95,7 @@ fi
 # (Sanitize version number to allow for early access releases)
 KEYTOOL_JAVA_MAJOR_VERSION=$($KEYTOOL_CMD -J-version 2>&1 | awk -F'[".]' '/version/ {print $2}' | sed 's/[^0-9].*//')
 echo "Current keytool java runtime major version: $KEYTOOL_JAVA_MAJOR_VERSION."
-if [ $KEYTOOL_JAVA_MAJOR_VERSION -lt '26' ]; then
+if [ "$KEYTOOL_JAVA_MAJOR_VERSION" -lt '26' ]; then
     echo "The keytool java runtime version must support RFC 9879."
     echo "Please rerun this script with PATH or JAVA_HOME set to use a java keytool with java runtime version 26 or later."
     exit 1
@@ -105,13 +105,13 @@ mkdir -p build/generated/pki
 cd build/generated/pki
 
 # Configure keytool to create FIPS compliant pkcs12 keystores - see RFC 9879
-KEYTOOL_CMD+=" -J-Dkeystore.pkcs12.keyProtectionAlgorithm=PBEWithHmacSHA256andAES_256"
-KEYTOOL_CMD+=" -J-Dkeystore.pkcs12.certProtectionAlgorithm=PBEWithHmacSHA256andAES_256"
-KEYTOOL_CMD+=" -J-Dkeystore.pkcs12.macAlgorithm=PBEWithHmacSHA256"
+KEYTOOL_CMD="$KEYTOOL_CMD -J-Dkeystore.pkcs12.keyProtectionAlgorithm=PBEWithHmacSHA256andAES_256"
+KEYTOOL_CMD="$KEYTOOL_CMD -J-Dkeystore.pkcs12.certProtectionAlgorithm=PBEWithHmacSHA256andAES_256"
+KEYTOOL_CMD="$KEYTOOL_CMD -J-Dkeystore.pkcs12.macAlgorithm=PBEWithHmacSHA256"
 
 serverip=127.0.0.1
 pass=Password1
-validity=`expr 365 \* 5` # 5 years
+validity=$((365 * 5)) # 5 years
 
 # Set the root and intermediate CA certificate key algorithms
 # RSA, DSA or EC
@@ -177,10 +177,10 @@ get_sigalg()
 gen_keypair()
 {
     echo "Generating $2 key-pair for $1"
-    get_keyparam $2
-    get_sigalg $2
-    $KEYTOOL_CMD -keypass $pass -storepass $pass -genkeypair -keyalg $2 $keyparam \
-        -sigalg $sigalg -storetype $st -keystore "$5" -alias $1 $3                \
+    get_keyparam "$2"
+    get_sigalg "$2"
+    $KEYTOOL_CMD -keypass $pass -storepass $pass -genkeypair -keyalg "$2" $keyparam \
+        -sigalg "$sigalg" -storetype $st -keystore "$5" -alias "$1" $3              \
         -validity $validity -dname "$4" 2>> genpki_log.txt
 }
 
@@ -193,8 +193,8 @@ gen_ec_keypair()
 {
     echo "Generating EC key-pair for $1 using $2"
     get_sigalg EC
-    $KEYTOOL_CMD -keypass $pass -storepass $pass -genkeypair -keyalg EC         \
-        -groupname $2 -sigalg $sigalg -storetype $st -keystore "$5" -alias $1 $3 \
+    $KEYTOOL_CMD -keypass $pass -storepass $pass -genkeypair -keyalg EC                 \
+        -groupname "$2" -sigalg "$sigalg" -storetype $st -keystore "$5" -alias "$1" $3  \
         -validity $validity -dname "$4" 2>> genpki_log.txt
 }
 
@@ -207,7 +207,7 @@ import_cert()
 {
     echo "Importing $2 into $3 as $1"
     $KEYTOOL_CMD -storepass $pass -storetype $st -keystore "$3" -importcert       \
-        -alias $1 -file "$2" -noprompt 2>> genpki_log.txt
+        -alias "$1" -file "$2" -noprompt 2>> genpki_log.txt
 }
 
 #
@@ -219,23 +219,23 @@ import_cert()
 #
 gen_cert()
 {
-    get_sigalg $4
+    get_sigalg "$4"
     signer_sigalg=$sigalg
-    get_sigalg $2
+    get_sigalg "$2"
     echo "Issuing certificate for $1 signed by $3 using $signer_sigalg"
     $KEYTOOL_CMD -keypass $pass -storepass $pass -storetype $st -keystore "$7"    \
-        -certreq -sigalg $sigalg -alias $1 |
+        -certreq -sigalg "$sigalg" -alias "$1" |
             $KEYTOOL_CMD $SECURITY_PROPERTIES_CLAUSE                              \
                 -keypass $pass -storepass $pass -storetype $st                    \
-                -keystore "$3.$ext" -gencert -sigalg $signer_sigalg               \
-                -validity $validity -alias $3 $5 -rfc > $1.pem
+                -keystore "$3.$ext" -gencert -sigalg "$signer_sigalg"             \
+                -validity $validity -alias "$3" $5 -rfc > "$1.pem"
 
 # Import the issued certificate into the keystore, replacing the self-signed
 # placeholder certificate, along with the rest of the certificate chain
     echo "Importing certs ($6 $1.pem) into $7"
-    cat $6 $1.pem |
+    cat $6 "$1.pem" |
         $KEYTOOL_CMD -storepass $pass -storetype $st -keystore "$7"               \
-            -importcert -alias $1 -noprompt 2>> genpki_log.txt
+            -importcert -alias "$1" -noprompt 2>> genpki_log.txt
 }
 
 #
@@ -248,8 +248,8 @@ gen_cert()
 #
 issue_cert()
 {
-    gen_keypair $1 $2 "$5" "$6" $9
-    gen_cert $1 $2 $3 $4 "$7" "$8" $9
+    gen_keypair "$1" "$2" "$5" "$6" "$9"
+    gen_cert "$1" "$2" "$3" "$4" "$7" "$8" "$9"
 }
 
 #
@@ -262,8 +262,8 @@ issue_cert()
 #
 issue_ec_cert()
 {
-    gen_ec_keypair $1 $2 "$5" "$6" $9
-    gen_cert $1 EC $3 $4 "$7" "$8" $9
+    gen_ec_keypair "$1" "$2" "$5" "$6" "$9"
+    gen_cert "$1" EC "$3" "$4" "$7" "$8" "$9"
 }
 
 # Generate key-pair for root certificate
@@ -389,8 +389,8 @@ mkdir -p nomac
 
 # Creating a copy of each keystore with keystore.pkcs12.macAlgorithm set to NONE
 for keystore in *.p12; do
-   echo ${keystore}
-   "$JAVA_CMD" MacAlgNoneUtil ${keystore} nomac/${keystore} $pass
+   echo "${keystore}"
+   "$JAVA_CMD" MacAlgNoneUtil "${keystore}" "nomac/${keystore}" $pass
 done
 
 rm -f MacAlgNoneUtil.java MacAlgNoneUtil.class
