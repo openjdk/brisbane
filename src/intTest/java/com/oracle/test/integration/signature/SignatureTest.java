@@ -59,7 +59,6 @@ import java.util.Collection;
 
 import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -434,7 +433,6 @@ public abstract class SignatureTest {
         sig.verify(bb);
     }
 
-    @Ignore
     @Test (expected = SignatureException.class)
     public void verifyExceptionSigZeroLength() throws Exception {
         initVerify();

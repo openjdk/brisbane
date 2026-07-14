@@ -158,6 +158,9 @@ public abstract class NoDigestSig extends SignatureSpi {
         initIfRequired();
         // Rely on Signature to check that object initialized for verify.
         try (OsslArena confinedArena = OsslArena.ofConfined()) {
+            if (len == 0) {
+                throw new SignatureException("Signature must not be zero length");
+            }
             PkeyCtx.Signature ctx = new PkeyCtx.Signature(this.lastPkey, confinedArena);
             byte[] bb = this.tbs.toByteArray();
             verifyInit(ctx);

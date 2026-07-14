@@ -193,6 +193,9 @@ abstract class DigestSignature extends SignatureSpi {
         initIfRequired();
         // Rely on Signature to check that object initialized for verify.
         try {
+            if (len == 0) {
+                throw new SignatureException("Signature must not be zero length");
+            }
             return this.ctx.verifyFinal(sigBytes, offset, len);
         } finally {
             releaseCtx();
