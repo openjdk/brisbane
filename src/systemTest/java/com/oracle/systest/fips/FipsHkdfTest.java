@@ -71,7 +71,8 @@ public class FipsHkdfTest {
     // Enforcement of KDF minimum security strength was first added to OpenSSL in version 3.4.0
     static final boolean OPENSSL_ENFORCES_MIN_SECURITY_STRENGTH =
             (FipsProviderInfoUtil.getMajorVersion() > 3) ||
-            (FipsProviderInfoUtil.getMajorVersion() == 3 && FipsProviderInfoUtil.getMinorVersion() >= 4);
+            (FipsProviderInfoUtil.getMajorVersion() == 3 && FipsProviderInfoUtil.getMinorVersion() >= 4) ||
+            (FipsProviderInfoUtil.getMajorVersion() == 1 && FipsProviderInfoUtil.getMinorVersion() == 2);
 
     private final AlgorithmParameterSpec spec;
     private final OperationResult expected;

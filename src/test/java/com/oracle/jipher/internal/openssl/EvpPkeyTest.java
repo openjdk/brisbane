@@ -201,6 +201,13 @@ public class EvpPkeyTest extends EvpTest {
         dupCtx.isA(this.alg);
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void active() {
+        EVP_PKEY dupKey = key.dup();
+        dupKey.free();
+        dupKey.isA(alg);
+    }
+
     @Test
     public void upRef() throws Exception {
         try (OsslArena confinedArena = OsslArena.ofConfined()) {

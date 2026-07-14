@@ -69,25 +69,24 @@ public class Capabilities {
         DEBUG.println("FIPS Provider detected " + name);
         DEBUG.println("FIPS Provider version " + patchVersion);
 
+        int majorVersion = -1;
+        int minorVersion = -1;
         boolean isPQCSupported = false;
         if (patchVersion != null) {
             String[] versionComponents = patchVersion.split("-")[0].split("\\.");
             if (versionComponents.length >= 2) {
                 try {
-                    int major = Integer.valueOf(versionComponents[0]);
-                    int minor = Integer.valueOf(versionComponents[1]);
-                    DEBUG.println("FIPS Provider major version " + major);
-                    DEBUG.println("FIPS Provider minor version " + minor);
+                    majorVersion = Integer.valueOf(versionComponents[0]);
+                    minorVersion = Integer.valueOf(versionComponents[1]);
+                    DEBUG.println("FIPS Provider major version " + majorVersion);
+                    DEBUG.println("FIPS Provider minor version " + minorVersion);
                     // FIPS certified support for PQC requires minor version >=5.
-                    isPQCSupported = (major == 3 && minor >= 5);
+                    isPQCSupported = (majorVersion == 3 && minorVersion >= 5);
                 } catch (NumberFormatException e) {
                     // Ignore
                 }
             }
         }
-        ML_KEM_IS_SUPPORTED = isPQCSupported;
-        ML_DSA_IS_SUPPORTED = isPQCSupported;
-
         boolean isRHDerivative = (name != null) &&
                 (name.contains("Red Hat Enterprise Linux") || name.contains("Oracle Linux"));
 
@@ -105,11 +104,15 @@ public class Capabilities {
             DESEDE_IS_SUPPORTED = false;
             DSA_IS_SUPPORTED = false;
             SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = false;
+            // In case of OS supplied OpenSSL, versions 1.x based of Kryoptic support PQC.
+            isPQCSupported |= majorVersion == 1;
         } else {
             DESEDE_IS_SUPPORTED = true;
             DSA_IS_SUPPORTED = true;
             SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = true;
         }
+        ML_KEM_IS_SUPPORTED = isPQCSupported;
+        ML_DSA_IS_SUPPORTED = isPQCSupported;
     }
 
     // The following getters facilitate mocking.

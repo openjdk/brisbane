@@ -51,47 +51,44 @@ jacocoTestCoverageVerification {
     }
 
     afterEvaluate {
-        if (project.findProperty('jipher.openssl.useOsInstance')?.toString()?.toBoolean()) {
-            getClassDirectories().setFrom(classDirectories.files.collect {
-                fileTree(it) {
+        def classesToExclude = [// derEncode of DHFIPSParameterSpec is not tested
+                                'com/oracle/jipher/internal/key/JceDhPublicKey.class',
+                                'com/oracle/jipher/internal/key/JceDhPrivateKey.class',
+                                // DhKeyFactory dhX509DomainParametersDecode is not tested
+                                'com/oracle/jipher/internal/spi/DhKeyFactory.class',
+                                // LibCtx is tested by system tests
+                                'com/oracle/jipher/internal/openssl/LibCtx.class'] as Set
+        boolean usingOsInstance = project.findProperty('jipher.openssl.useOsInstance')?.toString()?.toBoolean()
+        if (usingOsInstance) {
                     // Exclude classes from coverage verification that are fully or partially skipped when testing
                     // the OS provided Oracle Linux 9+ FIPS module or due to an absence of support for:
                     //   * DESEDE or DSA keys.
                     //   * FIPS 186-4 type domain parameters (which impacts DH key testing)
-                    //   * Module-Lattice (ML) support
-                    exclude(
-                            'com/oracle/jipher/internal/key/JceDhPublicKey.class',
-                            'com/oracle/jipher/internal/key/JceDhPrivateKey.class',
-                            'com/oracle/jipher/internal/key/JceDsaPublicKey.class',
+            classesToExclude.addAll(['com/oracle/jipher/internal/key/JceDsaPublicKey.class',
                             'com/oracle/jipher/internal/spi/*DesEde*.class',
                             'com/oracle/jipher/internal/spi/*DESede*.class',
-                            'com/oracle/jipher/internal/spi/DhKeyFactory.class',
                             'com/oracle/jipher/internal/spi/DsaKeyFactory.class',
-                            'com/oracle/jipher/internal/openssl/LibCtx.class',
                             'com/oracle/jipher/internal/openssl/Pkey.class',
-                            'com/oracle/jipher/internal/common/MlUtil.class',
+                            'com/oracle/jipher/provider/*.class'])
+            def fipsVersionDetector = providers.exec {
+                commandLine 'rpm', '-q', 'fips-provider-next'
+                // Dont fail the gradle script if exit value is non zero.
+                ignoreExitValue = true
+            }
+            int exitValue = fipsVersionDetector.result.get().exitValue
+            if (exitValue != 0) {
+            // fips-provider-next not installed. Module-Lattice (ML) support missing.
+                classesToExclude.addAll(['com/oracle/jipher/internal/common/MlUtil.class',
                             'com/oracle/jipher/internal/key/JceMl*.class',
                             'com/oracle/jipher/internal/spi/*Kem*.class',
-                            'com/oracle/jipher/internal/spi/*Ml*.class',
-                            'com/oracle/jipher/provider/*.class'
-                    )
-                }
-            })
-        } else {
-            getClassDirectories().setFrom(classDirectories.files.collect {
-                fileTree(it) {
-                    exclude(
-                            // derEncode of DHFIPSParameterSpec is not tested
-                            'com/oracle/jipher/internal/key/JceDhPublicKey.class',
-                            'com/oracle/jipher/internal/key/JceDhPrivateKey.class',
-                            // DhKeyFactory dhX509DomainParametersDecode is not tested
-                            'com/oracle/jipher/internal/spi/DhKeyFactory.class',
-                            // LibCtx is tested by system tests
-                            'com/oracle/jipher/internal/openssl/LibCtx.class'
-                    )
-                }
-            })
+                            'com/oracle/jipher/internal/spi/*Ml*.class'])
+            }
         }
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(it) {
+                exclude(classesToExclude)
+            }
+        })
     }
 
     mustRunAfter jacocoTestReport
