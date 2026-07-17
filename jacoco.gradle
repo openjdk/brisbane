@@ -41,7 +41,9 @@
 apply plugin: 'jacoco'
 
 jacoco {
-    toolVersion = '0.8.15' // Officially supports Java 25 (class file major version 69)
+    // Officially supports Java 26 (class file major version 70),
+    // Experimental support for Java 27 class files
+    toolVersion = '0.8.15'
 }
 
 jacocoTestCoverageVerification {
