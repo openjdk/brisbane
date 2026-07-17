@@ -76,8 +76,8 @@ public class Capabilities {
             String[] versionComponents = patchVersion.split("-")[0].split("\\.");
             if (versionComponents.length >= 2) {
                 try {
-                    majorVersion = Integer.valueOf(versionComponents[0]);
-                    minorVersion = Integer.valueOf(versionComponents[1]);
+                    majorVersion = Integer.parseInt(versionComponents[0]);
+                    minorVersion = Integer.parseInt(versionComponents[1]);
                     DEBUG.println("FIPS Provider major version " + majorVersion);
                     DEBUG.println("FIPS Provider minor version " + minorVersion);
                     // FIPS certified support for PQC requires minor version >=5.

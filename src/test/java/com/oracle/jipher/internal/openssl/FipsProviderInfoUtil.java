@@ -66,8 +66,8 @@ public class FipsProviderInfoUtil {
         boolean isPQCSupported = false;
         if (versionComponents.length >= 2) {
             try {
-                majorVersion = Integer.valueOf(versionComponents[0]);
-                minorVersion = Integer.valueOf(versionComponents[1]);
+                majorVersion = Integer.parseInt(versionComponents[0]);
+                minorVersion = Integer.parseInt(versionComponents[1]);
                 // FIPS certified support for PQC requires minor version >=5.
                 isPQCSupported = (majorVersion == 3 && minorVersion >= 5);
             } catch (NumberFormatException e) {

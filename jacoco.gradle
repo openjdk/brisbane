@@ -41,7 +41,7 @@
 apply plugin: 'jacoco'
 
 jacoco {
-    toolVersion = '0.8.14' // Officially supports Java 25 (class file major version 69)
+    toolVersion = '0.8.15' // Officially supports Java 25 (class file major version 69)
 }
 
 jacocoTestCoverageVerification {
@@ -60,10 +60,10 @@ jacocoTestCoverageVerification {
                                 'com/oracle/jipher/internal/openssl/LibCtx.class'] as Set
         boolean usingOsInstance = project.findProperty('jipher.openssl.useOsInstance')?.toString()?.toBoolean()
         if (usingOsInstance) {
-                    // Exclude classes from coverage verification that are fully or partially skipped when testing
-                    // the OS provided Oracle Linux 9+ FIPS module or due to an absence of support for:
-                    //   * DESEDE or DSA keys.
-                    //   * FIPS 186-4 type domain parameters (which impacts DH key testing)
+            // Exclude classes from coverage verification that are fully or partially skipped when testing
+            // the OS provided Oracle Linux 9+ FIPS module or due to an absence of support for:
+            //   * DESEDE or DSA keys.
+            //   * FIPS 186-4 type domain parameters (which impacts DH key testing)
             classesToExclude.addAll(['com/oracle/jipher/internal/key/JceDsaPublicKey.class',
                             'com/oracle/jipher/internal/spi/*DesEde*.class',
                             'com/oracle/jipher/internal/spi/*DESede*.class',
@@ -77,7 +77,7 @@ jacocoTestCoverageVerification {
             }
             int exitValue = fipsVersionDetector.result.get().exitValue
             if (exitValue != 0) {
-            // fips-provider-next not installed. Module-Lattice (ML) support missing.
+                //fips-provider-next not installed. Module-Lattice (ML) support missing.
                 classesToExclude.addAll(['com/oracle/jipher/internal/common/MlUtil.class',
                             'com/oracle/jipher/internal/key/JceMl*.class',
                             'com/oracle/jipher/internal/spi/*Kem*.class',
