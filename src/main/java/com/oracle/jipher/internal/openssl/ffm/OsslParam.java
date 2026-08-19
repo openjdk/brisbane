@@ -200,6 +200,15 @@ final class OsslParam {
         return keySeg.address() == 0L;
     }
 
+    static void cleanseData(MemorySegment paramSeg, long offset) {
+        MemorySegment dataSeg = (MemorySegment) OSSL_PARAM_DATA_HANDLE.get(paramSeg, offset);
+        long dataSize = (long) OSSL_PARAM_DATA_SIZE_HANDLE.get(paramSeg, offset);
+        if (dataSeg.address() != 0L && dataSize > 0L && dataSize <= UNBOUNDED_MAX) {
+            MemorySegment payloadSeg = dataSeg.reinterpret(dataSize);
+            payloadSeg.fill((byte) 0);
+        }
+    }
+
     static OSSL_PARAM load(MemorySegment paramSeg, long offset, boolean useReturnSize) {
         MemorySegment keySeg = (MemorySegment) OSSL_PARAM_KEY_HANDLE.get(paramSeg, offset);
         String key = keySeg.getString(0L);
