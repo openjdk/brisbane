@@ -49,6 +49,7 @@ import com.oracle.jipher.internal.fips.FIPSPolicyException;
 import com.oracle.jipher.internal.fips.Fips;
 import com.oracle.jipher.internal.key.JceOsslKey;
 import com.oracle.jipher.internal.openssl.MdAlg;
+import com.oracle.jipher.internal.openssl.Pkey;
 
 import static com.oracle.jipher.internal.fips.CryptoOp.VERIFY;
 
@@ -74,7 +75,10 @@ public abstract class RsaDigestSig extends DigestSignature {
             JceOsslKey pub = (JceOsslKey) kf.engineTranslateKey(publicKey);
             Fips.enforcement().checkStrength(VERIFY, pub);
             expectedLen = (((RSAKey) pub).getModulus().bitLength() + 7) >> 3;
-            doInit(pub.getPkey(), false);
+            // If pub is a java reference to the original key (no key translation took place)
+            // then create a native reference to the original PKEY so that the doInit code can always
+            // free the 'lastPkey' because it is not a key held by the application.
+            doInit(pub == publicKey ? Pkey.createReference(pub.getPkey()) : pub.getPkey(), false);
         } catch (FIPSPolicyException e) {
             throw new InvalidKeyException(e.getMessage(), e);
         }
