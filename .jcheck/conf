@@ -41,7 +41,7 @@
 [general]
 project=brisbane
 jbs=BRISBANE
-version=20-ea
+version=20
 
 [checks]
 error=author,committer,reviewers,merge,issues,executable,symlink,message,whitespace
