@@ -63,7 +63,7 @@ javadoc {
 }
 
 group = 'brisbane.jipher'
-version = findProperty('ProjVersion') ?: '20.0'
+version = findProperty('ProjVersion') ?: '20.1'
 
 tasks.withType(JavaCompile).configureEach {
     options.release = 25
