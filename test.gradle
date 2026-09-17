@@ -210,7 +210,6 @@ tasks.withType(Test).configureEach  { task ->
         jvmArgs += '-Xmx1024M'
     }
     // From JDK 9 onward internal JDK APIs are no longer accessible by default
-    jvmArgs += '--add-exports=java.base/sun.security.internal.interfaces=ALL-UNNAMED'
     jvmArgs += '--add-exports=java.base/sun.security.internal.spec=ALL-UNNAMED'
     jvmArgs += '--add-exports=java.base/sun.security.util=ALL-UNNAMED'
     // com.oracle.test.integration.tls.TlsTest uses sun.security.provider.X509Factory
@@ -344,7 +343,7 @@ project.ext.commonIntegrationTestConfig =  {
 
     // From JDK 9 onward internal JDK APIs are no longer accessible by default
     // com.oracle.test.integration.keygen.TlsMasterSecretKeyGenTest invokes methods on sun.security.internal.interfaces
-    jvmArgs += '--add-exports=java.base/sun.security.internal.interfaces=com.oracle.jipher,com.oracle.jiphertest.integration'
+    jvmArgs += '--add-exports=java.base/sun.security.internal.interfaces=com.oracle.jiphertest.integration'
 
     // com.oracle.jiphertest.util.TlsUtil and com.oracle.test.integration.keygen.TlsKeyMaterialKeyGen*Test use specClass
     jvmArgs += '--add-exports=java.base/sun.security.internal.spec=com.oracle.jipher,com.oracle.jiphertest.other,com.oracle.jiphertest.integration'
