@@ -307,7 +307,7 @@ final class OsslLibCtx implements OSSL_LIB_CTX {
     public void randBytes(byte[] bytes, int strength) {
         try (Arena arena = Arena.ofConfined()) {
             long bytesLen = bytes.length;
-            MemorySegment bytesSeg = OpenSslAllocators.malloc(bytesLen, arena);
+            MemorySegment bytesSeg = OpenSslAllocators.mallocClearFree(bytesLen, arena);
             try {
                 RAND_BYTES_EX_FUNC.invokeExact(this.osslLibCtx, bytesSeg, bytesLen, strength);
             } catch (Throwable t) {
