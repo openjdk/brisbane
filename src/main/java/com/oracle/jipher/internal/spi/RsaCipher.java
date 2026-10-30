@@ -48,7 +48,6 @@ import java.security.InvalidParameterException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.ProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
@@ -214,7 +213,7 @@ public abstract class RsaCipher extends CipherSpi {
         resetIfNecessary();
         if (len != 0) {
             if (len + this.bufOffset > this.buffer.length) {
-                this.bufOffset = buffer.length + 1; // Set it to one more than buffer length as an indicator.
+                this.bufOffset = this.buffer.length + 1; // Set it to one more than buffer length as an indicator.
             } else {
                 System.arraycopy(input, inOffset, this.buffer, this.bufOffset, len);
                 this.bufOffset += len;
@@ -227,14 +226,18 @@ public abstract class RsaCipher extends CipherSpi {
     protected byte[] engineDoFinal(byte[] input, int offset, int len) throws IllegalBlockSizeException, BadPaddingException {
         byte[] out = new byte[engineGetOutputSize(len)];
         try {
-            int outlen = engineDoFinal(input, offset, len, out, 0);
-            if (outlen == out.length) {
-                return out;
+            int outLen = engineDoFinal(input, offset, len, out, 0);
+            if (outLen == out.length) {
+                byte[] tmp = out;
+                out = null;
+                return tmp;
             }
-            return Arrays.copyOf(out, outlen);
+            return Arrays.copyOf(out, outLen);
         } catch (ShortBufferException e) {
             // Should not happen
-            throw new ProviderException(e);
+            throw new AssertionError("Internal error: Unexpected ShortBufferException", e);
+        } finally {
+            clearArray(out);
         }
     }
 
@@ -293,24 +296,26 @@ public abstract class RsaCipher extends CipherSpi {
     protected byte[] engineWrap(Key key) throws InvalidKeyException,
             IllegalBlockSizeException {
         byte[] encoded = key.getEncoded();
-        if ((encoded == null) || (encoded.length == 0)) {
-            throw new InvalidKeyException("Could not obtain encoded key");
-        }
-        if (encoded.length > buffer.length) {
-            throw new InvalidKeyException("Key is too long for wrapping");
-        }
         try {
+            if (encoded == null || encoded.length == 0) {
+                throw new InvalidKeyException("Could not obtain encoded key");
+            }
+            if (encoded.length > this.buffer.length) {
+                throw new InvalidKeyException("Key is too long for wrapping");
+            }
             return engineDoFinal(encoded, 0, encoded.length);
         } catch (BadPaddingException e) {
             // Should not occur
             throw new InvalidKeyException("Wrapping failed", e);
+        } finally {
+            clearArray(encoded);
         }
     }
 
     @Override
     protected Key engineUnwrap(byte[] wrappedKey, String keyAlg, int wrappedKeyType) throws InvalidKeyException, NoSuchAlgorithmException {
         byte[] keyBytes = null;
-        if (wrappedKey.length > buffer.length) {
+        if (wrappedKey.length > this.buffer.length) {
             throw new InvalidKeyException("Key is too long for unwrapping");
         }
         try {
@@ -331,9 +336,9 @@ public abstract class RsaCipher extends CipherSpi {
 
     private void cleanup() {
         if (this.buffer != null) {
-            Arrays.fill(buffer, (byte) 0);
-            buffer = null;
-            bufOffset = 0;
+            Arrays.fill(this.buffer, (byte) 0);
+            this.buffer = null;
+            this.bufOffset = 0;
         }
     }
 
@@ -359,9 +364,9 @@ public abstract class RsaCipher extends CipherSpi {
 
         private RsaOaep(MdAlg mdAlg, boolean fixed) {
             super(RsaCipherPadding.OAEP);
-            hasFixedMd = fixed;
-            defaultMdAlg = mdAlg;
-            paramSpec = getDefaultParameterSpec();
+            this.hasFixedMd = fixed;
+            this.defaultMdAlg = mdAlg;
+            this.paramSpec = getDefaultParameterSpec();
         }
 
         RsaOaep(MdAlg mdAlg) {
@@ -373,7 +378,7 @@ public abstract class RsaCipher extends CipherSpi {
         }
 
         OAEPParameterSpec getDefaultParameterSpec() {
-            return new OAEPParameterSpec(defaultMdAlg.getAlg(), "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT);
+            return new OAEPParameterSpec(this.defaultMdAlg.getAlg(), "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT);
         }
 
         @Override
