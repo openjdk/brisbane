@@ -48,7 +48,6 @@ import java.security.InvalidParameterException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.ProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
@@ -227,14 +226,18 @@ public abstract class RsaCipher extends CipherSpi {
     protected byte[] engineDoFinal(byte[] input, int offset, int len) throws IllegalBlockSizeException, BadPaddingException {
         byte[] out = new byte[engineGetOutputSize(len)];
         try {
-            int outlen = engineDoFinal(input, offset, len, out, 0);
-            if (outlen == out.length) {
-                return out;
+            int outLen = engineDoFinal(input, offset, len, out, 0);
+            if (outLen == out.length) {
+                byte[] tmp = out;
+                out = null;
+                return tmp;
             }
-            return Arrays.copyOf(out, outlen);
+            return Arrays.copyOf(out, outLen);
         } catch (ShortBufferException e) {
             // Should not happen
-            throw new ProviderException(e);
+            throw new AssertionError("Internal error: Unexpected ShortBufferException", e);
+        } finally {
+            clearArray(out);
         }
     }
 
