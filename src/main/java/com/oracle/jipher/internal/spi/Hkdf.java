@@ -147,7 +147,12 @@ public abstract class Hkdf extends KDFSpi {
     @Override
     protected SecretKey engineDeriveKey(String alg, AlgorithmParameterSpec derivationSpec) throws InvalidAlgorithmParameterException, NoSuchAlgorithmException {
         // JCA ensures alg is neither null nor empty string
-        return new SecretKeySpec(this.engineDeriveData(derivationSpec), alg);
+        byte[] derivedData = this.engineDeriveData(derivationSpec);
+        try {
+            return new SecretKeySpec(derivedData, alg);
+        } finally {
+            clearArray(derivedData);
+        }
     }
 
     @Override
