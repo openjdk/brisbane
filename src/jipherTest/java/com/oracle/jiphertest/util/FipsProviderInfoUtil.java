@@ -72,7 +72,8 @@ public class FipsProviderInfoUtil {
         MINOR_VERSION = patchVersionParts.length > 1 ? Integer.parseInt(patchVersionParts[1]) : 0;
         PATCH_VERSION = patchVersionParts.length > 2 ?Integer.parseInt(patchVersionParts[2]) : 0;
         boolean isPQCSupported;
-        if (MAJOR_VERSION >=3 && MINOR_VERSION >=5) {
+        // FIPS certified support for PQC requires OpenSSL 3.5 or later.
+        if (MAJOR_VERSION >= 4 || (MAJOR_VERSION >=3 && MINOR_VERSION >=5)) {
             isPQCSupported = true;
         } else {
             isPQCSupported = false;

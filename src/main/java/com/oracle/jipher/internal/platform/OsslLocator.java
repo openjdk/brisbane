@@ -88,9 +88,11 @@ public class OsslLocator {
             throw new ProviderException(NOT_SUPPORTED_PREFIX + THIS_PLATFORM);
         } else {
             for (String libDir : LIB_DIR_VARIANTS) {
-                Path path = OPENSSL_DIR_PATH.resolve(Paths.get(libDir, THIS_PLATFORM.getCryptoLibFilename()));
-                if (Files.exists(path) && Files.isExecutable(path) && !Files.isDirectory(path)) {
-                    return path;
+                for (String cryptoLibFilename : THIS_PLATFORM.getCryptoLibFilenames()) {
+                    Path path = OPENSSL_DIR_PATH.resolve(Paths.get(libDir, cryptoLibFilename));
+                    if (Files.exists(path) && Files.isExecutable(path) && !Files.isDirectory(path)) {
+                        return path;
+                    }
                 }
             }
             throw new ProviderException("OpenSSL crypto library path not found");

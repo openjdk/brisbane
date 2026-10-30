@@ -102,10 +102,10 @@ public abstract class Platform {
     public abstract Path getOpensslPath();
 
     /**
-     * Get the file name of the OpenSSL crypto library.
+     * Get an array of the potential file names of the OpenSSL crypto library.
      * @return The file name
      */
-    public abstract String getCryptoLibFilename();
+    public abstract String[] getCryptoLibFilenames();
 
 
     public abstract static class Unix extends Platform {
@@ -120,8 +120,8 @@ public abstract class Platform {
         }
 
         @Override
-        public String getCryptoLibFilename() {
-            return "libcrypto.so.3";
+        public String[] getCryptoLibFilenames() {
+            return new String[] {"libcrypto.so.3", "libcrypto.so.4"};
         }
     }
 
@@ -148,8 +148,8 @@ public abstract class Platform {
         }
 
         @Override
-        public String getCryptoLibFilename() {
-            return "libcrypto.3.dylib";
+        public String[] getCryptoLibFilenames() {
+            return new String[] {"libcrypto.3.dylib", "libcrypto.4.dylib"};
         }
     }
 
@@ -176,8 +176,8 @@ public abstract class Platform {
         }
 
         @Override
-        public String getCryptoLibFilename() {
-            return "libcrypto-3-x64.dll";
+        public String[] getCryptoLibFilenames() {
+            return new String[] {"libcrypto-3-x64.dll", "libcrypto-4-x64.dll"};
         }
     }
 

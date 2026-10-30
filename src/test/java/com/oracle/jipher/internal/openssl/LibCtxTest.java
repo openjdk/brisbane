@@ -55,7 +55,8 @@ public class LibCtxTest {
     @Test
     public void getFipsProviderVersionString() throws Exception {
         String version = LibCtx.getFipsProviderVersionString();
-        assertTrue(version.startsWith("3.") || version.equals("1.2.0") || version.equals("1.5.2"));
+        assertTrue(version.startsWith("3.") || version.startsWith("4.")
+            || version.equals("1.2.0") || version.equals("1.5.2"));
     }
 
     @Test
