@@ -51,6 +51,7 @@ import org.junit.Test;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_LIB_CRYPTO;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_LIB_EVP;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_LIB_OFFSET;
+import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_LIB_RAND;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_LIB_SYS;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_RFLAG_COMMON;
 import static com.oracle.jipher.internal.openssl.OpenSslErrorCode.ERR_RFLAG_FATAL;
@@ -180,6 +181,9 @@ public class OpenSslTest {
         assertEquals(ERR_R_MALLOC_FAILURE, mallocFailure.getReason());
         assertTrue(mallocFailure.isFatalError());
         assertTrue(mallocFailure.isCommonError());
+
+        OpenSslException randFailure = new OpenSslException("rand failure", null, (ERR_LIB_RAND << ERR_LIB_OFFSET) | 0x01);
+        assertEquals(ERR_LIB_RAND, randFailure.getLib());
     }
 
     @Test(expected = OutOfMemoryError.class)
