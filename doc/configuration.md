@@ -65,9 +65,9 @@ The directory must contain the following files:
 
 | OS      | Files                                                                                                     |
 |---------|-----------------------------------------------------------------------------------------------------------|
-| Linux   | `lib/libcrypto.so.3` <br> `lib/ossl-modules/fips.so` <br> `ssl/fipsmodule.cnf` or `ssl/openssl.cnf`       |
-| MacOS   | `lib/libcrypto.3.dylib` <br> `lib/ossl-modules/fips.dylib` <br> `ssl/fipsmodule.cnf` or `ssl/openssl.cnf` |
-| Windows | `bin\libcrypto-3-x64.dll` <br> `lib\ossl-modules\fips.dll` <br> `ssl\fipsmodule.cnf` or `ssl\openssl.cnf` |
+| Linux   | `lib/libcrypto.so.<major>` <br> `lib/ossl-modules/fips.so` <br> `ssl/fipsmodule.cnf` or `ssl/openssl.cnf`       |
+| MacOS   | `lib/libcrypto.<major>.dylib` <br> `lib/ossl-modules/fips.dylib` <br> `ssl/fipsmodule.cnf` or `ssl/openssl.cnf` |
+| Windows | `bin\libcrypto-<major>-x64.dll` <br> `lib\ossl-modules\fips.dll` <br> `ssl\fipsmodule.cnf` or `ssl\openssl.cnf` |
 
 If `lib64` exists, it is preferred over `lib`.
 

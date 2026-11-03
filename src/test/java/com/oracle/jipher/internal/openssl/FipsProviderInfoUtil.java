@@ -68,8 +68,8 @@ public class FipsProviderInfoUtil {
             try {
                 majorVersion = Integer.parseInt(versionComponents[0]);
                 minorVersion = Integer.parseInt(versionComponents[1]);
-                // FIPS certified support for PQC requires minor version >=5.
-                isPQCSupported = (majorVersion == 3 && minorVersion >= 5);
+                // FIPS certified support for PQC requires OpenSSL 3.5 or later.
+                isPQCSupported = (majorVersion >= 4 || (majorVersion == 3 && minorVersion >= 5));
             } catch (NumberFormatException e) {
                 isPQCSupported = false;
             }
@@ -94,7 +94,11 @@ public class FipsProviderInfoUtil {
             DSA_IS_SUPPORTED = true;
             SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = true;
             FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED = true;
-            KDF_MIN_PWD_LENGTH = 0;
+            if (VERSION.startsWith("4")) {
+                KDF_MIN_PWD_LENGTH = 8;
+            } else {
+                KDF_MIN_PWD_LENGTH = 0;
+            }
         }
         ML_KEM_IS_SUPPORTED = isPQCSupported;
         ML_DSA_IS_SUPPORTED = isPQCSupported;

@@ -167,6 +167,21 @@ public class LifeCycleHookTest {
         }
     }
 
+    // This test verifies that temporary memory allocated by randBytes() is allocated to be cleared when freed
+    @Test
+    public void randBytesUsesClearFree() {
+        try {
+            CALLBACK_RECORD_LIST.clear();
+            openSsl.setNativeObjectLifecycleCallback(LifeCycleHookTest::callbackHandler);
+
+            libCtx.randBytes(new byte[32], 256);
+
+            verifyAllocDealloc("CRYPTO_malloc", "CRYPTO_clear_free");
+        } finally {
+            openSsl.clearNativeObjectLifecycleCallback();
+        }
+    }
+
     void verifyAllocDealloc(String allocFuncName, String deallocFuncName) {
         assertEquals(2, CALLBACK_RECORD_LIST.size());
 

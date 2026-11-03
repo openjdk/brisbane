@@ -46,9 +46,9 @@ import org.junit.Before;
 
 public abstract class EvpTest {
 
-    OpenSsl openSsl;
-    OSSL_LIB_CTX libCtx;
-    OsslArena testArena;
+    protected OpenSsl openSsl;
+    protected OSSL_LIB_CTX libCtx;
+    protected OsslArena testArena;
 
     @Before
     public void setUp() throws Exception {

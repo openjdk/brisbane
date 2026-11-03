@@ -442,10 +442,17 @@ final class EvpCipherCtx extends PoolableObjectBase<EvpCipherCtx> implements EVP
             }
         }
 
-        MemorySegment keySeg = allocateFromNullable(key, requiredKeyLength, "key", this.keyBufPA);
-        // An AES/GCM nonce may be larger than MAX_IV_LENGTH as, if it is larger than 96 bits, it will first be digested with GMAC within OpenSSL.
-        MemorySegment ivSeg = allocateFromNullable(iv, requiredIvLength, "iv", this.ivBufPA);
-        evpCipherInitEx2(cipher, keySeg, ivSeg, enc, paramBuffer);
+        MemorySegment keySeg = MemorySegment.NULL;
+        MemorySegment ivSeg = MemorySegment.NULL;
+        try {
+            keySeg = allocateFromNullable(key, requiredKeyLength, "key", this.keyBufPA);
+            // An AES/GCM nonce may be larger than MAX_IV_LENGTH as, if it is larger than 96 bits, it will first be digested with GMAC within OpenSSL.
+            ivSeg = allocateFromNullable(iv, requiredIvLength, "iv", this.ivBufPA);
+            evpCipherInitEx2(cipher, keySeg, ivSeg, enc, paramBuffer);
+        } finally {
+            keySeg.fill((byte) 0);
+            ivSeg.fill((byte) 0);
+        }
 
         if (type != null) {
             this.mode = type.mode;
