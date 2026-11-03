@@ -40,6 +40,7 @@
 
 package com.oracle.jipher.internal.openssl.ffm;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 
@@ -56,6 +57,7 @@ import static com.oracle.jipher.internal.openssl.ffm.OsslParam.setEnd;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.store;
 import static java.lang.foreign.ValueLayout.JAVA_BYTE;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertThrows;
 
 public class OsslParamBufferImplTest {
 
@@ -83,7 +85,7 @@ public class OsslParamBufferImplTest {
     }
 
     @Test
-    public void osslParamClearFreeCleansesPayloadBeforeFree() {
+    public void clearFree() {
         long paramsSize = 2L * C_OSSL_PARAM_SIZE;
         long payloadSize = 32L;
         MemorySegment paramsSeg = OpenSslAllocators.malloc(paramsSize).reinterpret(paramsSize);
@@ -103,6 +105,39 @@ public class OsslParamBufferImplTest {
 
             OsslParamBufferImpl.osslParamClearFree(paramsSeg);
 
+            assertArrayEquals(new byte[(int) payloadSize], payloadSeg.toArray(JAVA_BYTE));
+        } finally {
+            OpenSslAllocators.free(payloadSeg);
+        }
+    }
+
+    @Test
+    public void clearOnExceptionNeg() {
+        long paramsSize = 2L * C_OSSL_PARAM_SIZE;
+        long payloadSize = 32L;
+        MemorySegment paramsSeg = OpenSslAllocators.malloc(paramsSize).reinterpret(paramsSize);
+        MemorySegment payloadSeg = OpenSslAllocators.malloc(payloadSize).reinterpret(payloadSize);
+
+        try {
+            paramsSeg.fill((byte) 0);
+            byte[] data = new byte[(int) payloadSize];
+            Arrays.fill(data, (byte) 0x5a);
+            OSSL_PARAM param = OSSL_PARAM.of("test-key", data);
+
+            // Use a fixed-segment allocator so that store() points the OSSL_PARAM data field at
+            // payloadSeg, allowing the cleanup path to be verified directly here.
+            store(param, paramsSeg, 0L, (byteSize, byteAlignment) -> payloadSeg);
+            setEnd(paramsSeg, C_OSSL_PARAM_SIZE);
+            payloadSeg.fill((byte) 0xa5);
+
+            // Pass a closed arena to newDataParamBuffer to provoke an exception allowing us to
+            // verify that the associated payloadSeg is cleansed on failure.
+            Arena arena = Arena.ofConfined();
+            arena.close();
+            assertThrows(IllegalStateException.class,
+                    () -> OsslParamBufferImpl.newDataParamBuffer(paramsSeg, arena, true));
+
+            // Verify that the failure path cleansed payloadSeg.
             assertArrayEquals(new byte[(int) payloadSize], payloadSeg.toArray(JAVA_BYTE));
         } finally {
             OpenSslAllocators.free(payloadSeg);
