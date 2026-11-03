@@ -193,12 +193,23 @@ public final class OsslParamBufferImpl implements OsslParamBuffer {
         if (paramsSeg.address() == 0L) {
             return EMPTY_PARAM_BUFFER;
         }
-        int paramCount = countParams(paramsSeg);
-        long paramsSegSize = (paramCount + 1) * C_OSSL_PARAM_SIZE;
         Consumer<MemorySegment> cleanup = privateExport
                 ? OsslParamBufferImpl::osslParamClearFree
                 : OsslParamBufferImpl::osslParamFree;
-        return new OsslParamBufferImpl(paramsSeg.reinterpret(paramsSegSize, arena, cleanup), paramCount, false);
+
+        boolean doCleanup = true;
+        try {
+            int paramCount = countParams(paramsSeg);
+            long paramsSegSize = (paramCount + 1L) * C_OSSL_PARAM_SIZE;
+            MemorySegment managedSeg = paramsSeg.reinterpret(paramsSegSize, arena, cleanup);
+
+            doCleanup = false;
+            return new OsslParamBufferImpl(managedSeg, paramCount, false);
+        } finally {
+            if (doCleanup) {
+                cleanup.accept(paramsSeg);
+            }
+        }
     }
 
     // Used for EVP_CipherInit_ex2, EVP_PKEY_fromdata, EVP_KDF_derive, EVP_PKEY_*_init_ex, EVP_*_get_params, EVP_*_set_params, etc.
