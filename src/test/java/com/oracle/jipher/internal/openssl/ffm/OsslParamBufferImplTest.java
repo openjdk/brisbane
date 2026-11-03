@@ -41,6 +41,7 @@
 package com.oracle.jipher.internal.openssl.ffm;
 
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -90,13 +91,15 @@ public class OsslParamBufferImplTest {
 
         try {
             paramsSeg.fill((byte) 0);
-            payloadSeg.fill((byte) 0x5a);
-            OSSL_PARAM param = OSSL_PARAM.of("test-key", new byte[(int) payloadSize]);
+            byte[] data = new byte[(int) payloadSize];
+            Arrays.fill(data, (byte) 0x5a);
+            OSSL_PARAM param = OSSL_PARAM.of("test-key", data);
 
             // Use a fixed-segment allocator so that store() points the OSSL_PARAM data field at
             // payloadSeg, allowing the cleanup path to be verified directly here.
             store(param, paramsSeg, 0L, (byteSize, byteAlignment) -> payloadSeg);
             setEnd(paramsSeg, C_OSSL_PARAM_SIZE);
+            payloadSeg.fill((byte) 0xa5);
 
             OsslParamBufferImpl.osslParamClearFree(paramsSeg);
 
