@@ -46,7 +46,7 @@ public interface OpenSslErrorCode {
     int ERR_SYSTEM_FLAG       = 0x80000000;
     int ERR_SYSTEM_MASK       = Integer.MAX_VALUE;
     int ERR_LIB_OFFSET        = 23;
-    int ERR_LIB_MASK          = 0x1F;
+    int ERR_LIB_MASK          = 0xFF;
     int ERR_RFLAGS_OFFSET     = 18;
     int ERR_RFLAGS_MASK       = 0x1F;
     int ERR_REASON_MASK       = 0x7FFFFF;
@@ -67,26 +67,20 @@ public interface OpenSslErrorCode {
     int ERR_LIB_OBJ           = 8;
     int ERR_LIB_PEM           = 9;
     int ERR_LIB_DSA           = 10;
-    int ERR_LIB_X509          = 11;
     int ERR_LIB_ASN1          = 13;
     int ERR_LIB_CONF          = 14;
     int ERR_LIB_CRYPTO        = 15;
     int ERR_LIB_EC            = 16;
-    int ERR_LIB_SSL           = 20;
     int ERR_LIB_BIO           = 32;
-    int ERR_LIB_PKCS7         = 33;
     int ERR_LIB_X509V3        = 34;
     int ERR_LIB_PKCS12        = 35;
     int ERR_LIB_RAND          = 36;
     int ERR_LIB_DSO           = 37;
-    int ERR_LIB_ENGINE        = 38;
-    int ERR_LIB_OCSP          = 39;
-    int ERR_LIB_UI            = 40;
     int ERR_LIB_COMP          = 41;
     int ERR_LIB_ECDSA         = 42;
     int ERR_LIB_ECDH          = 43;
-    int ERR_LIB_OSSL_STORE    = 44;
     int ERR_LIB_FIPS          = 45;
+    int ERR_LIB_PROV          = 57;
 
     int EVP_R_NO_CIPHER_SET   = 131;
     int EVP_R_NO_DIGEST_SET   = 139;

@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.oracle.jipher.internal.common.Util;
@@ -352,6 +353,8 @@ public class EvpKdfTest extends EvpTest {
         byte[] password = new byte[8 - 1];
         byte[] output = new byte[16];
 
+        Assume.assumeTrue(FipsProviderInfoUtil.getKDFMinPwdLen() >= 8);
+
         OSSL_PARAM saltParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_SALT, salt);
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, MIN_ITERATION_COUNT);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
@@ -359,10 +362,14 @@ public class EvpKdfTest extends EvpTest {
         String fipsProviderName = FipsProviderInfoUtil.getName();
         try {
             kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam);
-            Assert.assertFalse(fipsProviderName.contains("Red Hat Enterprise Linux") || fipsProviderName.contains("Oracle Linux"));
+            Assert.fail("Invalid password length accepted");
         } catch (OpenSslException e) {
-            Assert.assertTrue(fipsProviderName.contains("Red Hat Enterprise Linux") || fipsProviderName.contains("Oracle Linux"));
-            Assert.assertTrue(e.getMessage().contains("invalid key length")); // (RHE/O)L error message uses 'key' not 'password'
+            // RedHat/Oracle Linux FIPS module error message uses 'key' not 'password'
+            if (fipsProviderName.contains("Red Hat Enterprise Linux") || fipsProviderName.contains("Oracle Linux")) {
+                Assert.assertTrue(e.getMessage().contains("invalid key length"));
+            } else {
+                Assert.assertTrue(e.getMessage().contains("password strength too weak"));
+            }
         }
     }
 
