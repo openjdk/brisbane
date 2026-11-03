@@ -200,6 +200,28 @@ final class OsslParam {
         return keySeg.address() == 0L;
     }
 
+    static void cleanseData(MemorySegment paramSeg, long offset) {
+        int dataType = (int) OSSL_PARAM_DATA_TYPE_HANDLE.get(paramSeg, offset);
+        if (dataType < 0 || dataType >= Type.values().length) {
+            // Skip unknown native values.
+            return;
+        }
+        switch (Type.values()[dataType]) {
+            case INTEGER, UNSIGNED_INTEGER, REAL, UTF8_STRING, OCTET_STRING -> {
+                // Continue cleansing value parameters (UTF8_PTR and OCTET_PTR are intentionally skipped).
+            }
+            default -> {
+                return;
+            }
+        }
+        MemorySegment dataSeg = (MemorySegment) OSSL_PARAM_DATA_HANDLE.get(paramSeg, offset);
+        long dataSize = (long) OSSL_PARAM_DATA_SIZE_HANDLE.get(paramSeg, offset);
+        if (dataSeg.address() != 0L && dataSize > 0L && dataSize <= UNBOUNDED_MAX) {
+            MemorySegment payloadSeg = dataSeg.reinterpret(dataSize);
+            payloadSeg.fill((byte) 0);
+        }
+    }
+
     static OSSL_PARAM load(MemorySegment paramSeg, long offset, boolean useReturnSize) {
         MemorySegment keySeg = (MemorySegment) OSSL_PARAM_KEY_HANDLE.get(paramSeg, offset);
         String key = keySeg.getString(0L);
