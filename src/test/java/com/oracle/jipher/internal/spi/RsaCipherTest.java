@@ -42,6 +42,7 @@ package com.oracle.jipher.internal.spi;
 
 import java.lang.reflect.Field;
 import java.security.InvalidKeyException;
+import java.util.Arrays;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
@@ -50,10 +51,160 @@ import javax.crypto.ShortBufferException;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 public class RsaCipherTest {
+
+    private static final int OUTPUT_SIZE = 8;
+    private static final byte FILL_VALUE = 0x55;
+
+    private static byte[] filledBytes(int length) {
+        byte[] bytes = new byte[length];
+        Arrays.fill(bytes, FILL_VALUE);
+        return bytes;
+    }
+
+    @Test
+    public void doFinalFullOutput() throws Exception {
+        byte[][] outputRef = new byte[1][];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            @Override
+            protected int engineGetOutputSize(int inputLen) {
+                return OUTPUT_SIZE;
+            }
+
+            @Override
+            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset) {
+                outputRef[0] = output;
+                Arrays.fill(output, FILL_VALUE);
+                return OUTPUT_SIZE;
+            }
+        };
+
+        byte[] result = cipher.engineDoFinal(new byte[0], 0, 0);
+
+        assertSame(outputRef[0], result);
+        assertArrayEquals(filledBytes(OUTPUT_SIZE), result);
+    }
+
+    @Test
+    public void doFinalShortOutput() throws Exception {
+        final int shortOutputSize = OUTPUT_SIZE - 1;
+        byte[][] outputRef = new byte[1][];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            @Override
+            protected int engineGetOutputSize(int inputLen) {
+                return OUTPUT_SIZE;
+            }
+
+            @Override
+            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset) {
+                outputRef[0] = output;
+                Arrays.fill(output, FILL_VALUE);
+                return shortOutputSize;
+            }
+        };
+
+        byte[] result = cipher.engineDoFinal(new byte[0], 0, 0);
+
+        // Short output is returned in a new buffer, leaving the output buffer to be cleared.
+        assertNotSame(outputRef[0], result);
+        assertArrayEquals(filledBytes(shortOutputSize), result);
+        assertArrayEquals(new byte[OUTPUT_SIZE], outputRef[0]);
+    }
+
+    @Test
+    public void doFinalBadPaddingNeg() throws Exception {
+        BadPaddingException failure = new BadPaddingException();
+        byte[][] outputRef = new byte[1][];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            @Override
+            protected int engineGetOutputSize(int inputLen) {
+                return OUTPUT_SIZE;
+            }
+
+            @Override
+            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset)
+                    throws BadPaddingException {
+                outputRef[0] = output;
+                Arrays.fill(output, FILL_VALUE);
+                throw failure;
+            }
+        };
+
+        try {
+            cipher.engineDoFinal(new byte[0], 0, 0);
+        } catch (BadPaddingException e) {
+            assertSame(failure, e);
+            assertArrayEquals(new byte[OUTPUT_SIZE], outputRef[0]);
+            return;
+        }
+
+        fail("Expected BadPaddingException");
+    }
+
+    @Test
+    public void doFinalIllegalBlockSizeNeg() throws Exception {
+        IllegalBlockSizeException failure = new IllegalBlockSizeException();
+        byte[][] outputRef = new byte[1][];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            @Override
+            protected int engineGetOutputSize(int inputLen) {
+                return OUTPUT_SIZE;
+            }
+
+            @Override
+            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset)
+                    throws IllegalBlockSizeException {
+                outputRef[0] = output;
+                Arrays.fill(output, FILL_VALUE);
+                throw failure;
+            }
+        };
+
+        try {
+            cipher.engineDoFinal(new byte[0], 0, 0);
+        } catch (IllegalBlockSizeException e) {
+            assertSame(failure, e);
+            assertArrayEquals(new byte[OUTPUT_SIZE], outputRef[0]);
+            return;
+        }
+
+        fail("Expected IllegalBlockSizeException");
+    }
+
+    @Test
+    public void doFinalShortBufferNeg() throws Exception {
+        ShortBufferException failure = new ShortBufferException();
+        byte[][] outputRef = new byte[1][];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            @Override
+            protected int engineGetOutputSize(int inputLen) {
+                return OUTPUT_SIZE;
+            }
+
+            @Override
+            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset)
+                    throws ShortBufferException {
+                outputRef[0] = output;
+                Arrays.fill(output, FILL_VALUE);
+                throw failure;
+            }
+        };
+
+        try {
+            cipher.engineDoFinal(new byte[0], 0, 0);
+        } catch (AssertionError e) {
+            // ShortBufferException is unexpected in engineDoFinal so it is wrapped in an AssertionError.
+            assertSame(failure, e.getCause());
+            assertArrayEquals(new byte[OUTPUT_SIZE], outputRef[0]);
+            return;
+        }
+
+        fail("Expected AssertionError");
+    }
 
     static class SecretKeyDummy implements SecretKey {
 
@@ -83,32 +234,6 @@ public class RsaCipherTest {
         public String getFormat() {
             return "RAW";
         }
-    }
-
-    @Test
-    public void doFinalShortBufferNeg() throws Exception {
-        ShortBufferException shortBufferException = new ShortBufferException();
-        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
-            @Override
-            protected int engineGetOutputSize(int inputLen) {
-                return 1;
-            }
-
-            @Override
-            protected int engineDoFinal(byte[] input, int offset, int len, byte[] output, int outOffset)
-                    throws ShortBufferException, IllegalBlockSizeException, BadPaddingException {
-                throw shortBufferException;
-            }
-        };
-
-        try {
-            cipher.engineDoFinal(new byte[0], 0, 0);
-        } catch (AssertionError e) {
-            assertSame(shortBufferException, e.getCause());
-            return;
-        }
-
-        fail("Expected AssertionError");
     }
 
     @Test

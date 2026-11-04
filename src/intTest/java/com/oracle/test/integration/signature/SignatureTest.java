@@ -598,6 +598,27 @@ public abstract class SignatureTest {
         }
 
         @Test
+        public void verifyReinitWithOriginalKey() throws Exception {
+            sig = ProviderUtil.getSignature(alg);
+            initSign(privKey, spec);
+            sig.update(testData);
+            byte[] signature = sig.sign();
+            assertTrue(signature.length > 0);
+
+            // Create a new Signature instance so that from now on this test focuses on verifier
+            // reinitialization.
+            sig = ProviderUtil.getSignature(alg);
+            // Replacing pubKey with another key must not free pubKey's application-owned
+            // wrapper. This is proven by setting pubKey again after the replacement and
+            // verifying the signature with it.
+            initVerify(pubKey, spec);
+            initVerify(KeyUtil.getDummyPublicKey(kp.getAlg(), kp.getPub()), spec);
+            initVerify(pubKey, spec);
+            sig.update(testData);
+            assertTrue(sig.verify(signature));
+        }
+
+        @Test
         public void signEmptyVerify() throws Exception {
             Assume.assumeFalse(this.alg.endsWith("withDSA"));
             PrivateKey privKey = KeyUtil.loadPrivate(kpEmpty.getAlg(), kpEmpty.getPriv());
