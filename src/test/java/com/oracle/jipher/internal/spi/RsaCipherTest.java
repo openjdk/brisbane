@@ -40,9 +40,12 @@
 
 package com.oracle.jipher.internal.spi;
 
+import java.lang.reflect.Field;
+import java.security.InvalidKeyException;
 import java.util.Arrays;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
 
 import org.junit.Test;
@@ -201,5 +204,147 @@ public class RsaCipherTest {
         }
 
         fail("Expected AssertionError");
+    }
+
+    static class SecretKeyDummy implements SecretKey {
+
+        private final byte[] key;
+        private final String alg;
+
+        private SecretKeyDummy(byte[] key, String alg) {
+            this.alg = alg;
+            this.key = key;
+        }
+
+        @Override
+        public String getAlgorithm() {
+            return this.alg;
+        }
+
+        @Override
+        public byte[] getEncoded() {
+            return key;
+        }
+
+        public byte[] getKey() {
+            return key;
+        }
+
+        @Override
+        public String getFormat() {
+            return "RAW";
+        }
+    }
+
+    @Test
+    public void wrapEncoding() throws Exception {
+        byte[] encoding = new byte[] {1, 2, 3};
+        byte[] wrapped = new byte[] {4, 5, 6};
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            {
+                // Use reflection to mock RsaCipher initialization state.
+                // This unit test only needs buffer.length as the configurable wrap input
+                // capacity to exercise engineWrap, and does not need real RSA/OpenSSL
+                // initialization.
+                Field bufferField = RsaCipher.class.getDeclaredField("buffer");
+                bufferField.setAccessible(true);
+                bufferField.set(this, new byte[encoding.length]);
+            }
+
+            @Override
+            protected byte[] engineDoFinal(byte[] input, int offset, int len) {
+                return wrapped;
+            }
+        };
+
+        assertSame(wrapped, cipher.engineWrap(new SecretKeyDummy(encoding, "AES")));
+
+        assertArrayEquals(new byte[encoding.length], encoding);
+    }
+
+    @Test
+    public void wrapNullEncodingNeg() throws Exception {
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {};
+
+        try {
+            cipher.engineWrap(new SecretKeyDummy(null, "AES"));
+        } catch (InvalidKeyException e) {
+            return;
+        }
+
+        fail("Expected InvalidKeyException");
+    }
+
+    @Test
+    public void wrapEmptyEncodingNeg() throws Exception {
+        byte[] encoding = new byte[0];
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {};
+
+        try {
+            cipher.engineWrap(new SecretKeyDummy(encoding, "AES"));
+        } catch (InvalidKeyException e) {
+            assertArrayEquals(new byte[0], encoding);
+            return;
+        }
+
+        fail("Expected InvalidKeyException");
+    }
+
+    @Test
+    public void wrapTooLongEncodingNeg() throws Exception {
+        byte[] encoding = new byte[] {1, 2, 3};
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            {
+                // Use reflection to mock RsaCipher initialization state.
+                // This unit test only needs buffer.length as the configurable wrap input
+                // capacity to exercise engineWrap, and does not need real RSA/OpenSSL
+                // initialization.
+                Field bufferField = RsaCipher.class.getDeclaredField("buffer");
+                bufferField.setAccessible(true);
+                bufferField.set(this, new byte[encoding.length - 1]);
+            }
+        };
+
+        try {
+            cipher.engineWrap(new SecretKeyDummy(encoding, "AES"));
+        } catch (InvalidKeyException e) {
+            assertArrayEquals(new byte[encoding.length], encoding);
+            return;
+        }
+
+        fail("Expected InvalidKeyException");
+    }
+
+    @Test
+    public void wrapFailureEncodingNeg() throws Exception {
+        byte[] encoding = new byte[] {1, 2, 3};
+        IllegalBlockSizeException failure = new IllegalBlockSizeException();
+        RsaCipher cipher = new RsaCipher(RsaCipherPadding.OAEP) {
+            {
+                // Use reflection to mock RsaCipher initialization state.
+                // This unit test only needs buffer.length as the configurable wrap input
+                // capacity to exercise engineWrap, and does not need real RSA/OpenSSL
+                // initialization.
+                Field bufferField = RsaCipher.class.getDeclaredField("buffer");
+                bufferField.setAccessible(true);
+                bufferField.set(this, new byte[encoding.length]);
+            }
+
+            @Override
+            protected byte[] engineDoFinal(byte[] input, int offset, int len)
+                    throws IllegalBlockSizeException {
+                throw failure;
+            }
+        };
+
+        try {
+            cipher.engineWrap(new SecretKeyDummy(encoding, "AES"));
+        } catch (IllegalBlockSizeException e) {
+            assertSame(failure, e);
+            assertArrayEquals(new byte[encoding.length], encoding);
+            return;
+        }
+
+        fail("Expected IllegalBlockSizeException");
     }
 }
