@@ -57,21 +57,13 @@ public class EnvUtil {
     private static final int JIPHER_PBKDF2_MINIMUM_PASSWORD_LENGTH = max(0, Integer.getInteger("jipher.pbkdf2.minimumPasswordLength", 8));
 
     /**
-     * Returns the major component of the java.runtime.version
+     * Returns the feature release of the running Java runtime.
      *
-     * @throws ParseException if the value of the system property java.runtime.version
-     *         cannot be parsed to extract the major component
-     * @return the major component of the java.runtime.version
+     * @throws ParseException retained for compatibility with existing callers; never thrown
+     * @return the Java feature release
      */
     public static int getJavaRuntimeMajorVersion() throws ParseException {
-        String runtimeVersionString = System.getProperty("java.runtime.version");
-        int offset = runtimeVersionString.startsWith("1.") ? 2 : 0;
-        Pattern pattern = Pattern.compile("^\\d+");
-        Matcher matcher = pattern.matcher(runtimeVersionString.substring(offset));
-        if (matcher.find()) {
-            return Integer.parseInt(matcher.group());
-        }
-        throw new ParseException(runtimeVersionString, offset);
+        return Runtime.version().feature();
     }
 
     public static boolean isOracleJdk() {
@@ -79,11 +71,7 @@ public class EnvUtil {
     }
 
     public static boolean isJdk26Plus() {
-        try {
-            return Integer.parseInt(JAVA_SPECIFICATION_VER) >= 26;
-        } catch (NumberFormatException ex) {
-            return false;
-        }
+        return Runtime.version().feature() >= 26;
     }
 
     public enum FipsPolicy {

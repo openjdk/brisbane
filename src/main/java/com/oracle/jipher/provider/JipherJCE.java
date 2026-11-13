@@ -632,7 +632,8 @@ public final class JipherJCE extends Provider {
         putService("KeyGenerator", "SunTls12Prf",
                 TlsPrfGenerator.class.getName(), TlsPrfGenerator::new);
         putService("KeyGenerator", "SunTlsExtendedMasterSecret",
-                TlsMasterSecretGenerator.class.getName(), TlsMasterSecretGenerator::new);
+                TlsMasterSecretGenerator.class.getName(), TlsMasterSecretGenerator::new,
+                "SunTls12ExtendedMasterSecret");
         putService("KeyGenerator", "SunTlsKeyMaterial",
                 TlsKeyMaterialGenerator.class.getName(), TlsKeyMaterialGenerator::new,
                 "SunTls12KeyMaterial");
