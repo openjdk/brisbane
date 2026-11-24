@@ -40,10 +40,6 @@
 
 package com.oracle.jiphertest.util;
 
-import java.text.ParseException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import static java.lang.Math.max;
 
 public class EnvUtil {
@@ -59,10 +55,9 @@ public class EnvUtil {
     /**
      * Returns the feature release of the running Java runtime.
      *
-     * @throws ParseException retained for compatibility with existing callers; never thrown
      * @return the Java feature release
      */
-    public static int getJavaRuntimeMajorVersion() throws ParseException {
+    public static int getJavaRuntimeMajorVersion() {
         return Runtime.version().feature();
     }
 
