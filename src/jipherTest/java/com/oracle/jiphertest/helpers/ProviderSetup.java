@@ -45,6 +45,17 @@ import java.security.Security;
 import java.util.List;
 
 public class ProviderSetup {
+    static public void enableHybridGroupProvider(List<String> providerNames, String namedGroup) {
+        // JDK 28 implements hybrid KEMs and their key-pair generators in SunJCE,
+        // replacing JDK 27's internal hybrid provider. Retain SunJCE before filtering.
+        if (Runtime.version().feature() >= 28
+                && List.of("X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024")
+                        .stream().anyMatch(namedGroup::equalsIgnoreCase)) {
+            providerNames.add("SunJCE");
+            System.err.println("WARNING: Enabling SunJCE for hybrid TLS named group " + namedGroup);
+        }
+    }
+
     static public void limitProviders(List<String> requiredProviderNames) {
         // Dynamically unregister all cryptographic service providers other that those required.
         for (Provider provider : Security.getProviders()) {

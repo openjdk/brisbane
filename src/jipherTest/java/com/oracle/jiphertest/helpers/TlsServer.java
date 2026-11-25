@@ -260,6 +260,8 @@ public class TlsServer {
                 // SunEC is required to provide X25519 component of X25519MLKEM768
                 requiredProviderNames.add("SunEC");
             }
+            ProviderSetup.enableHybridGroupProvider(requiredProviderNames,
+                    System.getProperty("jdk.tls.namedGroups", ""));
             ProviderSetup.limitProviders(requiredProviderNames);
             assertNotNull(Security.getProvider("JipherJCE"));
         }
