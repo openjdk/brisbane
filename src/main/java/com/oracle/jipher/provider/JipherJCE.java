@@ -46,7 +46,6 @@ import java.security.InvalidParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.ProviderException;
-import java.text.ParseException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -293,13 +292,8 @@ public final class JipherJCE extends Provider {
     }
 
     // Returns the integer value of the major version component of the value of java.runtime.version
-    // or 0 if the major version component of the value of java.runtime.version cannot be parsed
     private static int getJavaRuntimeMajorVersion() {
-        try {
-            return Util.getJavaRuntimeMajorVersion();
-        } catch (ParseException e) {
-            return 0;
-        }
+        return Util.getJavaRuntimeMajorVersion();
     }
 
     /**
@@ -632,7 +626,8 @@ public final class JipherJCE extends Provider {
         putService("KeyGenerator", "SunTls12Prf",
                 TlsPrfGenerator.class.getName(), TlsPrfGenerator::new);
         putService("KeyGenerator", "SunTlsExtendedMasterSecret",
-                TlsMasterSecretGenerator.class.getName(), TlsMasterSecretGenerator::new);
+                TlsMasterSecretGenerator.class.getName(), TlsMasterSecretGenerator::new,
+                "SunTls12ExtendedMasterSecret");
         putService("KeyGenerator", "SunTlsKeyMaterial",
                 TlsKeyMaterialGenerator.class.getName(), TlsKeyMaterialGenerator::new,
                 "SunTls12KeyMaterial");

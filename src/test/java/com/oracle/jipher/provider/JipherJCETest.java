@@ -45,7 +45,6 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.security.Provider;
 import java.security.ProviderException;
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -437,20 +436,12 @@ public class JipherJCETest {
         boolean registrationExpected = true;
 
         if (service.equals("Signature") && algorithm.equalsIgnoreCase("MD5withRSA")) {
-            try {
-                registrationExpected = ToolkitProperties.getJavaVendorValue().startsWith("Oracle") &&
-                        EnvUtil.getJavaRuntimeMajorVersion() < 26;
-            } catch (ParseException e) {
-                registrationExpected = false;
-            }
+            registrationExpected = ToolkitProperties.getJavaVendorValue().startsWith("Oracle") &&
+                    EnvUtil.getJavaRuntimeMajorVersion() < 26;
         }
 
         if (service.equalsIgnoreCase("KDF")) {
-            try {
-                registrationExpected = (EnvUtil.getJavaRuntimeMajorVersion() >= 25);
-            } catch (ParseException e) {
-                registrationExpected = false;
-            }
+            registrationExpected = (EnvUtil.getJavaRuntimeMajorVersion() >= 25);
         }
 
         if (!isDESEDESupported) {
@@ -481,12 +472,8 @@ public class JipherJCETest {
         if (!isSHA1DigestSignatureSupported) {
             if (service.equals("Signature")) {
                 if (algorithm.toLowerCase().startsWith("Sha1With".toLowerCase())) {
-                    try {
-                        registrationExpected = algorithm.equalsIgnoreCase("SHA1withECDSA") &&
-                                EnvUtil.getJavaRuntimeMajorVersion() < 27;
-                    } catch (ParseException e) {
-                        registrationExpected = false;
-                    }
+                    registrationExpected = algorithm.equalsIgnoreCase("SHA1withECDSA") &&
+                            EnvUtil.getJavaRuntimeMajorVersion() < 27;
                 }
             }
         }

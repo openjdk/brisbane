@@ -51,10 +51,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
 import java.security.Key;
 import java.security.MessageDigest;
-import java.text.ParseException;
 import java.util.Arrays;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 
@@ -339,18 +336,9 @@ public final class Util {
     /**
      * Returns the major component of the java.runtime.version
      *
-     * @throws ParseException if the value of the system property java.runtime.version
-     *         cannot be parsed to extract the major component
      * @return the major component of the java.runtime.version
      */
-    public static int getJavaRuntimeMajorVersion() throws ParseException {
-        String runtimeVersionString = ToolkitProperties.getJavaRuntimeVersionValue();
-        int offset = runtimeVersionString.startsWith("1.") ? 2 : 0;
-        Pattern pattern = Pattern.compile("^\\d+");
-        Matcher matcher = pattern.matcher(runtimeVersionString.substring(offset));
-        if (matcher.find()) {
-            return Integer.parseInt(matcher.group());
-        }
-        throw new ParseException(runtimeVersionString, offset);
+    public static int getJavaRuntimeMajorVersion() {
+        return Runtime.version().feature();
     }
 }
