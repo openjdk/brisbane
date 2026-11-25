@@ -52,7 +52,6 @@ import java.security.InvalidParameterException;
 import java.security.Key;
 import java.security.MessageDigest;
 import java.util.Arrays;
-
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 
