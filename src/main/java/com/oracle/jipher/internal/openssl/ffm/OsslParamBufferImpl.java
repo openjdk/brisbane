@@ -62,6 +62,7 @@ import static com.oracle.jipher.internal.openssl.ffm.OsslParam.C_OSSL_PARAM;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.C_OSSL_PARAM_ALIGNMENT;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.C_OSSL_PARAM_SIZE;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.calcBufferMemoryRequirement;
+import static com.oracle.jipher.internal.openssl.ffm.OsslParam.cleanseData;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.isEnd;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.load;
 import static com.oracle.jipher.internal.openssl.ffm.OsslParam.setEnd;
@@ -156,6 +157,22 @@ public final class OsslParamBufferImpl implements OsslParamBuffer {
         }
     }
 
+    // Only use this for private keypair exports returned by EVP_PKEY_todata(PKEY_KEYPAIR, ...).
+    static void osslParamClearFree(MemorySegment paramsSeg) {
+        try {
+            // Iterate over the OSSL_PARAMs in paramsSeg before the END marker, and cleanse each owned
+            // payload before OSSL_PARAM_free releases the allocation back to OpenSSL.
+            long offset = 0L;
+            while (!isEnd(paramsSeg, offset)) {
+                cleanseData(paramsSeg, offset);
+                offset += C_OSSL_PARAM_SIZE;
+            }
+        } finally {
+            // Always free the OpenSSL-owned OSSL_PARAM structure, even if payload cleansing fails.
+            osslParamFree(paramsSeg);
+        }
+    }
+
     // Used for EVP_*_gettable*_params and EVP_*_settable*_params.
     static OsslParamBuffer newReadOnlyTemplateParamBuffer(MemorySegment paramsSeg) {
         if (paramsSeg.address() == 0L) {
@@ -168,12 +185,31 @@ public final class OsslParamBufferImpl implements OsslParamBuffer {
 
     // Used for EVP_PKEY_todata.
     static OsslParamBuffer newDataParamBuffer(MemorySegment paramsSeg, Arena arena) {
+        return newDataParamBuffer(paramsSeg, arena, false);
+    }
+
+    // Used for EVP_PKEY_todata.
+    static OsslParamBuffer newDataParamBuffer(MemorySegment paramsSeg, Arena arena, boolean privateExport) {
         if (paramsSeg.address() == 0L) {
             return EMPTY_PARAM_BUFFER;
         }
-        int paramCount = countParams(paramsSeg);
-        long paramsSegSize = (paramCount + 1) * C_OSSL_PARAM_SIZE;
-        return new OsslParamBufferImpl(paramsSeg.reinterpret(paramsSegSize, arena, OsslParamBufferImpl::osslParamFree), paramCount, false);
+        Consumer<MemorySegment> cleanup = privateExport
+                ? OsslParamBufferImpl::osslParamClearFree
+                : OsslParamBufferImpl::osslParamFree;
+
+        boolean doCleanup = true;
+        try {
+            int paramCount = countParams(paramsSeg);
+            long paramsSegSize = (paramCount + 1L) * C_OSSL_PARAM_SIZE;
+            MemorySegment managedSeg = paramsSeg.reinterpret(paramsSegSize, arena, cleanup);
+
+            doCleanup = false;
+            return new OsslParamBufferImpl(managedSeg, paramCount, false);
+        } finally {
+            if (doCleanup) {
+                cleanup.accept(paramsSeg);
+            }
+        }
     }
 
     // Used for EVP_CipherInit_ex2, EVP_PKEY_fromdata, EVP_KDF_derive, EVP_PKEY_*_init_ex, EVP_*_get_params, EVP_*_set_params, etc.

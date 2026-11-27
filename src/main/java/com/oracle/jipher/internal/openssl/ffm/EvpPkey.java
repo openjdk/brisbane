@@ -318,7 +318,7 @@ final class EvpPkey implements EVP_PKEY {
         if (paramsSeg.address() == 0L) {
             throw newOpenSslException("EVP_PKEY_todata: out param buffer is NULL,");
         }
-        return newDataParamBuffer(paramsSeg, arena);
+        return newDataParamBuffer(paramsSeg, arena, selection == Selection.PKEY_KEYPAIR);
     }
 
     private static class IdempotentCleanup implements Consumer<MemorySegment> {
